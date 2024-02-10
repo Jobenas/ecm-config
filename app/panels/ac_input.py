@@ -110,16 +110,13 @@ class AcInputPanel(wx.ScrolledWindow):
 
     def create_card(self, title, rows):
         box = wx.StaticBox(self, label=title, size=(300, -1))  # Set a fixed width for the box
+
         sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
-
-        label = wx.StaticText(self, label=f"{title}:")
-        label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
-
-        sizer.Add(label, flag=wx.ALL, border=5)
 
         for row in rows:
             items = row["items"]
-
+            font = wx.Font(11, wx.DEFAULT, wx.NORMAL, wx.BOLD)
+            box.SetFont(font)
             grid_sizer = wx.GridSizer(rows=len(items), cols=2, vgap=5,
                                       hgap=5)  # Adjust the number of rows in the GridSizer
 
@@ -200,18 +197,41 @@ class AcInputPanel(wx.ScrolledWindow):
         return v_sizer
 
     def on_save(self, event):
-        start_hour = str(self.current_start_hour).zfill(2)
-        start_minute = str(self.current_start_minute).zfill(2)
-        end_hour = str(self.current_end_hour).zfill(2)
-        end_minute = str(self.current_end_minute).zfill(2)
+        if self.serial_comms_controller.is_open():
+            start_hour = str(self.current_start_hour).zfill(2)
+            start_minute = str(self.current_start_minute).zfill(2)
+            end_hour = str(self.current_end_hour).zfill(2)
+            end_minute = str(self.current_end_minute).zfill(2)
 
-        self.ac_schedule_info["start_schedule"]["text_ctrl"].SetValue(f"{start_hour}:{start_minute}")
-        self.ac_schedule_info["end_schedule"]["text_ctrl"].SetValue(f"{end_hour}:{end_minute}")
+            self.ac_schedule_info["start_schedule"]["text_ctrl"].SetValue(f"{start_hour}:{start_minute}")
+            self.ac_schedule_info["end_schedule"]["text_ctrl"].SetValue(f"{end_hour}:{end_minute}")
 
-        # Add logic to save to serial controller or perform other actions
-        ac_config_msg = f"AT+ACINPUT={start_hour},{start_minute},{end_hour},{end_minute}\r\n"
-        print(f"Schedule config message: {ac_config_msg}")
-        response = self.serial_comms_controller.send_command(ac_config_msg)
+            dlg = wx.ProgressDialog(
+                "Cargando parámetros",
+                "Por favor espere mientras se realiza la carga",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
 
-        if response == "OK\r\n":
-            wx.MessageBox("Valores cargados correctamente", "Info", wx.OK | wx.ICON_INFORMATION)
+            ac_config_msg = f"AT+ACINPUT={start_hour},{start_minute},{end_hour},{end_minute}\r\n"
+            print(f"Schedule config message: {ac_config_msg}")
+            response = self.serial_comms_controller.send_command(ac_config_msg)
+            dlg.Update(1, "Cargando configuración de entrada AC...")
+
+            dlg.Destroy()
+
+            if response == "OK\r\n":
+                wx.MessageBox("Valores cargados correctamente", "Info", wx.OK | wx.ICON_INFORMATION)
+            else:
+                wx.MessageBox(
+                    f"No se pudieron guardar los valores",
+                    "Error",
+                    wx.OK | wx.ICON_ERROR,
+                )
+        else:
+            wx.MessageBox(
+                "No se puede guardar la configuración de entrada AC, el puerto serial está cerrado",
+                "Error",
+                wx.OK | wx.ICON_ERROR
+            )

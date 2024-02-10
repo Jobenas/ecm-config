@@ -134,12 +134,9 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
 
     def create_card(self, title, rows):
         box = wx.StaticBox(self, label=title, size=(300, -1))  # Set a fixed width for the box
+        font = wx.Font(11, wx.DEFAULT, wx.NORMAL, wx.BOLD)
+        box.SetFont(font)
         sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
-
-        label = wx.StaticText(self, label=f"{title}:")
-        label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
-
-        sizer.Add(label, flag=wx.ALL, border=5)
 
         for row in rows:
             items = row["items"]
@@ -231,25 +228,49 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
         return v_sizer
 
     def on_save(self, event):
-        open_hour = str(self.current_open_hour).zfill(2)
-        open_minute = str(self.current_open_minute).zfill(2)
-        open_relay_status = "1" if self.current_open_contact == "NA" else "0"
-        close_hour = str(self.current_close_hour).zfill(2)
-        close_minute = str(self.current_close_minute).zfill(2)
-        close_relay_status = "1" if self.current_close_contact == "NA" else "0"
+        if self.serial_comms_controller.is_open():
+            open_hour = str(self.current_open_hour).zfill(2)
+            open_minute = str(self.current_open_minute).zfill(2)
+            open_relay_status = "1" if self.current_open_contact == "NA" else "0"
+            close_hour = str(self.current_close_hour).zfill(2)
+            close_minute = str(self.current_close_minute).zfill(2)
+            close_relay_status = "1" if self.current_close_contact == "NA" else "0"
 
-        self.schedule_info["on_schedule"]["value"] = f"{open_hour}:{open_minute}"
-        self.schedule_info["off_schedule"]["value"] = f"{close_hour}:{close_minute}"
-        self.schedule_info["on_contactor_state"]["value"] = open_relay_status
-        self.schedule_info["off_contactor_state"]["value"] = close_relay_status
+            self.schedule_info["on_schedule"]["value"] = f"{open_hour}:{open_minute}"
+            self.schedule_info["off_schedule"]["value"] = f"{close_hour}:{close_minute}"
+            self.schedule_info["on_contactor_state"]["value"] = open_relay_status
+            self.schedule_info["off_contactor_state"]["value"] = close_relay_status
 
-        # Add logic to save to serial controller or perform other actions
-        schedule_config_msg = f"AT+SCHEDULE={open_hour},{open_minute},{open_relay_status},{close_hour},{close_minute},{close_relay_status}\r\n"
-        print(f"Schedule config message: {schedule_config_msg}")
-        response = self.serial_comms_controller.send_command(schedule_config_msg)
+            dlg = wx.ProgressDialog(
+                "Cargando parámetros",
+                "Por favor espere mientras se realiza la carga",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
 
-        if response == "OK\r\n":
-            wx.MessageBox("Valores cargados correctamente", "Info", wx.OK | wx.ICON_INFORMATION)
+            # Add logic to save to serial controller or perform other actions
+            schedule_config_msg = f"AT+SCHEDULE={open_hour},{open_minute},{open_relay_status},{close_hour},{close_minute},{close_relay_status}\r\n"
+            print(f"Schedule config message: {schedule_config_msg}")
+            response = self.serial_comms_controller.send_command(schedule_config_msg)
+            dlg.Update(1, "Cargando el control por horario...")
+
+            dlg.Destroy()
+
+            if response == "OK\r\n":
+                wx.MessageBox("Valores cargados correctamente", "Info", wx.OK | wx.ICON_INFORMATION)
+            else:
+                wx.MessageBox(
+                    f"No se pudieron guardar los valores",
+                    "Error",
+                    wx.OK | wx.ICON_ERROR,
+                )
+        else:
+            wx.MessageBox(
+                "No se puede guardar la configuración de horario, el puerto serial está cerrado",
+                "Error",
+                wx.OK | wx.ICON_ERROR
+            )
 
     def get_schedule_text(self, hour_key, minute_key, relay_status_key):
         return (

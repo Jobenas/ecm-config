@@ -30,7 +30,7 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 					{
 						"type": "single-item",
 						"items": [
-							{"label": "Cuenta de Pulsos Actual", "key": "pulse_count", "type": "single"},
+							{"label": "Cuenta de Pulsos", "key": "pulse_count", "type": "single"},
 						],
 					},
 				],
@@ -72,7 +72,7 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 						],
 					}
 				],
-				"title": "Control por Horario",
+				"title": "Control de la entrada AC",
 				"type": "multiple"
 			},
 			{
@@ -84,7 +84,7 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 						],
 					},
 				],
-				"title": "Cuenta de Pulsos Actual",
+				"title": "Configuración de la Entrada Digital",
 				"type": "multiple"
 			},
 		]
@@ -151,12 +151,9 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 
 	def create_card(self, title, rows):
 		box = wx.StaticBox(self, label=title, size=(300, -1))  # Set a fixed width for the box
+		font = wx.Font(11, wx.DEFAULT, wx.NORMAL, wx.BOLD)
+		box.SetFont(font)
 		sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
-
-		label = wx.StaticText(self, label=f"{title}:")
-		label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
-
-		sizer.Add(label, flag=wx.ALL, border=5)
 
 		for row in rows:
 			items = row["items"]

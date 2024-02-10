@@ -48,6 +48,12 @@ class MainFrame(wx.Frame):
 
 		self.toolbar.AddStretchableSpace()
 
+		self.selected_port = wx.StaticText(self.toolbar, label=f"Puerto: {self.serial_controller.port}")
+		self.toolbar.AddControl(self.selected_port)
+
+		self.vertical_spacer = wx.StaticText(self.toolbar, label="\t\t")
+		self.toolbar.AddControl(self.vertical_spacer)
+
 		self.port_status_label = wx.StaticText(self.toolbar, label="Estado del puerto: ")
 		self.toolbar.AddControl(self.port_status_label)
 
@@ -67,7 +73,15 @@ class MainFrame(wx.Frame):
 		self.SetSizer(sizer)
 		self.Layout()
 
+		self.page_controller.Bind(aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.on_page_close)
+
+	def on_page_close(self, event):
+		# Prevent the tab from closing
+		event.Veto()
+
 	def on_close(self, event):
+		if self.serial_controller.is_open():
+			self.serial_controller.close()
 		self.Destroy()
 
 	def setup_tabs(self):

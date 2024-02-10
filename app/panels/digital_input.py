@@ -100,12 +100,9 @@ class DigitalInputPanel(wx.ScrolledWindow):
 
     def create_card(self, title, rows):
         box = wx.StaticBox(self, label=title, size=(300, -1))  # Set a fixed width for the box
+        font = wx.Font(11, wx.DEFAULT, wx.NORMAL, wx.BOLD)
+        box.SetFont(font)
         sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
-
-        label = wx.StaticText(self, label=f"{title}:")
-        label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
-
-        sizer.Add(label, flag=wx.ALL, border=5)
 
         for row in rows:
             items = row["items"]
@@ -167,29 +164,46 @@ class DigitalInputPanel(wx.ScrolledWindow):
         return v_sizer
 
     def on_save(self, event):
-        digital_input_mode = (
-            1 if self.current_digital_input_mode == "Solo alerta" else 0
-        )
-
-        print(f"Digital input mode: {digital_input_mode}")
-
-        self.dc_input_info["dc_input_mode"]["text_ctrl"].SetValue("TOGGLE_RELAY" if digital_input_mode == 0 else "ALERT_ONLY")
-
-        dc_config_msg = f"AT+CONFIG={digital_input_mode}0,00\r\n"
-        print(f"DC config msg: {dc_config_msg}")
-        response = self.serial_comms_controller.send_command(dc_config_msg)
-
-        if response == "OK\r\n":
-            wx.MessageBox(
-                f"Valores guardados correctamente!",
-                "Info",
-                wx.OK | wx.ICON_INFORMATION,
+        if self.serial_comms_controller.is_open():
+            digital_input_mode = (
+                1 if self.current_digital_input_mode == "Solo alerta" else 0
             )
+
+            print(f"Digital input mode: {digital_input_mode}")
+
+            self.dc_input_info["dc_input_mode"]["text_ctrl"].SetValue("TOGGLE_RELAY" if digital_input_mode == 0 else "ALERT_ONLY")
+            dlg = wx.ProgressDialog(
+                "Cargando parámetros",
+                "Por favor espere mientras se realiza la carga",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
+
+            dc_config_msg = f"AT+CONFIG={digital_input_mode}0,00\r\n"
+            print(f"DC config msg: {dc_config_msg}")
+            response = self.serial_comms_controller.send_command(dc_config_msg)
+            dlg.Update(1, "Cargando el control por horario...")
+
+            dlg.Destroy()
+
+            if response == "OK\r\n":
+                wx.MessageBox(
+                    f"Valores guardados correctamente!",
+                    "Info",
+                    wx.OK | wx.ICON_INFORMATION,
+                )
+            else:
+                wx.MessageBox(
+                    f"No se pudieron guardar los valores",
+                    "Error",
+                    wx.OK | wx.ICON_ERROR,
+                )
         else:
             wx.MessageBox(
-                f"No se pudieron guardar los valores",
+                "No se puede guardar la configuración de entrada digital, el puerto serial está cerrado",
                 "Error",
-                wx.OK | wx.ICON_ERROR,
+                wx.OK | wx.ICON_ERROR
             )
 
     def get_status_text(self):
