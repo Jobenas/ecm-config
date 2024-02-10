@@ -8,10 +8,8 @@ class AcInputPanel(wx.ScrolledWindow):
         self.serial_comms_controller = serial_comms_controller
 
         self.ac_schedule_info = {
-            "start_hour": "",
-            "start_minute": "",
-            "end_hour": "",
-            "end_minute": "",
+            "start_schedule": {"value": "", "text_ctrl": None},
+            "end_schedule": {"value": "", "text_ctrl": None},
         }
 
         self.current_start_hour = 0
@@ -25,9 +23,31 @@ class AcInputPanel(wx.ScrolledWindow):
     def init_ui(self):
         sizer = wx.BoxSizer(wx.VERTICAL)
 
+        rows = [
+            {
+                "rows": [
+                    {
+                        "type": "multi-item",
+                        "items": [
+                            {"label": "Horario de Inicio", "key": "start_schedule", "type": "single"},
+                        ],
+                    },
+                    {
+                        "type": "multi-item",
+                        "items": [
+                            {"label": "Horario de Fin", "key": "end_schedule", "type": "single"},
+                        ],
+                    }
+                ],
+                "title": "Control por Horario",
+                "type": "multiple"
+            },
+        ]
+
         sizer.Add(self.create_title("Configuracion de entrada AC"))
-        sizer.Add(self.create_card("Hora de inicio", "start_hour", "start_minute"))
-        sizer.Add(self.create_card("Horario de fin", "end_hour", "end_minute"))
+
+        for row in rows:
+            sizer.Add(self.create_card(row['title'], row["rows"]))
 
         sizer.AddSpacer(20)
 
@@ -50,7 +70,29 @@ class AcInputPanel(wx.ScrolledWindow):
         self.SetSizer(sizer)
 
     def on_read(self, event):
-        print("This is where we reada the AC Input data")
+        if self.serial_comms_controller.is_open():
+            dlg = wx.ProgressDialog(
+                "Leyendo parámetros",
+                "Por favor espere mientras se realiza la lectura",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
+            ac_input_schedule = self.serial_comms_controller.send_command("AT+ACINPUT?\r\n")
+            print(f"AC input schedule: {ac_input_schedule}")
+            dlg.Update(1, "Leyendo la configuración de entrada AC...")
+
+            dlg.Destroy()
+
+            ac_input_list = ac_input_schedule[:-2].split(",")
+            ac_on_schedule = f"{ac_input_list[0]}:{ac_input_list[1]}" if ac_input_list[0] != "99" else "No configurado"
+            ac_off_schedule = f"{ac_input_list[2]}:{ac_input_list[3]}" if ac_input_list[2] != "99" else "No configurado"
+
+            self.ac_schedule_info["start_schedule"]["text_ctrl"].SetValue(ac_on_schedule)
+            self.ac_schedule_info["end_schedule"]["text_ctrl"].SetValue(ac_off_schedule)
+        else:
+            wx.MessageBox("No se puede leer la configuración de entrada AC, el puerto serial no está abierto",
+                          "Error", wx.OK | wx.ICON_ERROR)
 
     def create_title(self, title):
         title_text = wx.StaticText(self, label=title)
@@ -66,32 +108,38 @@ class AcInputPanel(wx.ScrolledWindow):
 
         return v_sizer
 
-    def create_card(self, title, hour_key, minute_key):
-        box = wx.StaticBox(self, label=title)
-        font = wx.Font(9, wx.DEFAULT, wx.NORMAL, wx.BOLD)
-        box.SetFont(font)
+    def create_card(self, title, rows):
+        box = wx.StaticBox(self, label=title, size=(300, -1))  # Set a fixed width for the box
         sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
 
-        text_ctrl = wx.TextCtrl(self, value=f"{self.ac_schedule_info[hour_key]}:{self.ac_schedule_info[minute_key]}",
-                                style=wx.TE_READONLY, size=(200, -1))
-        # label = wx.StaticText(self, label=f"{title}:")
-        # label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
+        label = wx.StaticText(self, label=f"{title}:")
+        label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
 
-        # sizer.Add(label, flag=wx.ALL, border=5)
-        sizer.Add(text_ctrl, flag=wx.EXPAND | wx.ALL, border=5)
+        sizer.Add(label, flag=wx.ALL, border=5)
 
-        # Create a horizontal box sizer
+        for row in rows:
+            items = row["items"]
+
+            grid_sizer = wx.GridSizer(rows=len(items), cols=2, vgap=5,
+                                      hgap=5)  # Adjust the number of rows in the GridSizer
+
+            for item in items:
+                key = item['key']
+                label = wx.StaticText(self, label=item["label"])
+                grid_sizer.Add(label, flag=wx.ALL, border=5)
+                text_ctrl = wx.TextCtrl(self, value=str(self.ac_schedule_info[key]['value']),
+                                        style=wx.TE_READONLY, size=(50, -1))
+                self.ac_schedule_info[key]["text_ctrl"] = text_ctrl
+                grid_sizer.Add(text_ctrl, flag=wx.EXPAND | wx.ALL, border=5)
+
+            sizer.Add(grid_sizer, flag=wx.EXPAND)
+
         h_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        # Add a spacer to the left of the sizer
-        h_sizer.Add((20, 0))  # 20 is the width of the spacer, adjust as needed
-        # Add the original sizer to the horizontal sizer
+        h_sizer.Add((20, 0))
         h_sizer.Add(sizer, 1, flag=wx.EXPAND)
 
-        # Create a vertical box sizer
         v_sizer = wx.BoxSizer(wx.VERTICAL)
-        # Add a spacer to the top of the sizer
-        v_sizer.Add((0, 20))  # 20 is the height of the spacer, adjust as needed
-        # Add the horizontal sizer to the vertical sizer
+        v_sizer.Add((0, 20))
         v_sizer.Add(h_sizer, 1, flag=wx.EXPAND)
 
         return v_sizer
@@ -102,51 +150,52 @@ class AcInputPanel(wx.ScrolledWindow):
         box.SetFont(font)
         sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
 
-        # start_label = wx.StaticText(self, label=f"{title}:")
-        # start_label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
-
         hour_choices = [str(value) for value in range(24)]
         minute_choices = [str(value) for value in range(60)]
 
-        start_hour_combo = wx.ComboBox(self, choices=hour_choices, style=wx.CB_READONLY, size=(200, -1))
-        start_hour_combo.SetValue(str(self.current_start_hour))
+        if identifier == "start":
+            current_hour = self.current_start_hour
+            current_minute = self.current_start_minute
+        else:  # identifier == "end"
+            current_hour = self.current_end_hour
+            current_minute = self.current_end_minute
 
-        start_minute_combo = wx.ComboBox(self, choices=minute_choices, style=wx.CB_READONLY, size=(200, -1))
-        start_minute_combo.SetValue(str(self.current_start_minute))
+        hour_combo = wx.ComboBox(self, choices=hour_choices, style=wx.CB_READONLY, size=(200, -1))
+        hour_combo.SetValue(str(current_hour))
 
-        # Create a horizontal box sizer for the dropdown menus
+        minute_combo = wx.ComboBox(self, choices=minute_choices, style=wx.CB_READONLY, size=(200, -1))
+        minute_combo.SetValue(str(current_minute))
+
         dropdown_sizer = wx.BoxSizer(wx.HORIZONTAL)
         dropdown_sizer.Add(wx.StaticText(self, label="Hora: "), flag=wx.ALL, border=5)
-        dropdown_sizer.Add(start_hour_combo, flag=wx.ALL, border=5)
+        dropdown_sizer.Add(hour_combo, flag=wx.ALL, border=5)
         dropdown_sizer.Add(wx.StaticText(self, label="Minutos: "), flag=wx.ALL, border=5)
-        dropdown_sizer.Add(start_minute_combo, flag=wx.ALL, border=5)
+        dropdown_sizer.Add(minute_combo, flag=wx.ALL, border=5)
 
-        # Replace the separate sizer.Add calls for the dropdown menus with a single call
-        # sizer.Add(start_label, flag=wx.ALL, border=5)
         sizer.Add(dropdown_sizer, flag=wx.ALL, border=5)
 
-        # Create a horizontal box sizer
         h_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        # Add a spacer to the left of the sizer
         h_sizer.Add((20, 0))  # 20 is the width of the spacer, adjust as needed
-        # Add the original sizer to the horizontal sizer
         h_sizer.Add(sizer, 1, flag=wx.EXPAND)
 
-        # Create a vertical box sizer
         v_sizer = wx.BoxSizer(wx.VERTICAL)
-        # Add a spacer to the top of the sizer
         v_sizer.Add((0, 20))  # 20 is the height of the spacer, adjust as needed
-        # Add the horizontal sizer to the vertical sizer
         v_sizer.Add(h_sizer, 1, flag=wx.EXPAND)
 
         def on_hour_change(event):
-            self.current_start_hour = int(start_hour_combo.GetValue())
+            if identifier == "start":
+                self.current_start_hour = int(hour_combo.GetValue())
+            else:  # identifier == "end"
+                self.current_end_hour = int(hour_combo.GetValue())
 
         def on_minute_change(event):
-            self.current_start_minute = int(start_minute_combo.GetValue())
+            if identifier == "start":
+                self.current_start_minute = int(minute_combo.GetValue())
+            else:  # identifier == "end"
+                self.current_end_minute = int(minute_combo.GetValue())
 
-        start_hour_combo.Bind(wx.EVT_COMBOBOX, on_hour_change)
-        start_minute_combo.Bind(wx.EVT_COMBOBOX, on_minute_change)
+        hour_combo.Bind(wx.EVT_COMBOBOX, on_hour_change)
+        minute_combo.Bind(wx.EVT_COMBOBOX, on_minute_change)
 
         return v_sizer
 
@@ -156,14 +205,13 @@ class AcInputPanel(wx.ScrolledWindow):
         end_hour = str(self.current_end_hour).zfill(2)
         end_minute = str(self.current_end_minute).zfill(2)
 
-        ac_schedule_info = {
-            "start_hour": start_hour,
-            "start_minute": start_minute,
-            "end_hour": end_hour,
-            "end_minute": end_minute,
-        }
+        self.ac_schedule_info["start_schedule"]["text_ctrl"].SetValue(f"{start_hour}:{start_minute}")
+        self.ac_schedule_info["end_schedule"]["text_ctrl"].SetValue(f"{end_hour}:{end_minute}")
 
-        self.ac_schedule_info = ac_schedule_info
         # Add logic to save to serial controller or perform other actions
+        ac_config_msg = f"AT+ACINPUT={start_hour},{start_minute},{end_hour},{end_minute}\r\n"
+        print(f"Schedule config message: {ac_config_msg}")
+        response = self.serial_comms_controller.send_command(ac_config_msg)
 
-        wx.MessageBox("Values saved!", "Info", wx.OK | wx.ICON_INFORMATION)
+        if response == "OK\r\n":
+            wx.MessageBox("Valores cargados correctamente", "Info", wx.OK | wx.ICON_INFORMATION)
