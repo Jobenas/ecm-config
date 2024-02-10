@@ -10,7 +10,7 @@ from app.panels.ac_input import AcInputPanel
 from app.panels.device_status import DeviceStatusPanel
 from app.panels.digital_input import DigitalInputPanel
 from app.panels.schedule_config import ScheduleConfigPanel
-from app.dialogs.settings import SettingsDialog
+from app.dialogs.settings import SettingsDialog, EVT_PORT_CHANGED
 
 
 def set_taskbar_icon(frame, icon_path):
@@ -46,10 +46,23 @@ class MainFrame(wx.Frame):
 		self.toolbar.SetToolBitmapSize((16, 16))
 		self.setup_toolbar()
 
+		self.toolbar.AddStretchableSpace()
+
+		self.port_status_label = wx.StaticText(self.toolbar, label="Estado del puerto: ")
+		self.toolbar.AddControl(self.port_status_label)
+
+		self.port_status = wx.StaticText(self.toolbar, label="")
+		self.toolbar.AddControl(self.port_status)
+
+		self.toolbar.Realize()
+		self.update_port_status()
+
 		self.setup_tabs()
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(self.page_controller, 1, wx.EXPAND)
+
+		self.Bind(EVT_PORT_CHANGED, self.on_port_changed)
 
 		self.SetSizer(sizer)
 		self.Layout()
@@ -120,6 +133,9 @@ class MainFrame(wx.Frame):
 		self.Bind(wx.EVT_TOOL, self.on_close_port, id=close_port_id)
 		self.Bind(wx.EVT_TOOL, self.on_ajustes, id=ajustes_id)
 
+		self.Bind(wx.EVT_TOOL, self.on_open_port, id=open_port_id)
+		self.Bind(wx.EVT_TOOL, self.on_close_port, id=close_port_id)
+
 	def on_ajustes(self, event):
 		dialog = SettingsDialog(self, "Settings", self.serial_controller)
 		dialog.ShowModal()
@@ -136,17 +152,44 @@ class MainFrame(wx.Frame):
 	def on_open_port(self, event):
 		if self.serial_controller.serial_created:
 			self.serial_controller.open()
-			print(f"Status of serial port is {'open' if self.serial_controller.is_open() else 'closed'}")
+			print(f"Status of serial port {self.serial_controller.port} is "
+				  f"{'open' if self.serial_controller.is_open() else 'closed'}")
 		else:
 			try:
 				self.serial_controller.create_serial()
 				self.serial_controller.serial_created = True
 			except serial.SerialException:
 				wx.MessageBox("Puerto Serial no disponible, seleccione otro")
+		self.update_port_status()
 
 	def on_close_port(self, event):
 		if self.serial_controller.serial_created:
 			self.serial_controller.close()
-			print(f"Status of serial port is {'open' if self.serial_controller.is_open() else 'closed'}")
+			print(f"Status of serial port {self.serial_controller.port} is "
+				  f"{'open' if self.serial_controller.is_open() else 'closed'}")
 		else:
 			wx.MessageBox("Puerto Serial no disponible, seleccione otro")
+		self.update_port_status()
+
+	def update_port_status(self):
+		try:
+			if self.serial_controller.is_open():
+				self.port_status.SetLabel("ABIERTO")
+				self.port_status.SetForegroundColour(wx.GREEN)
+			else:
+				self.port_status.SetLabel("CERRADO")
+				self.port_status.SetForegroundColour(wx.RED)
+		except serial.SerialException:
+			self.port_status.SetLabel("NO DISPONIBLE")
+			self.port_status.SetForegroundColour(wx.RED)
+		self.toolbar.Realize()
+
+	def on_port_changed(self, event):
+		new_port = event.get_port()
+		self.serial_controller.update_port(new_port)
+
+		if not self.serial_controller.open():
+			wx.MessageBox("No se pudo abrir el puerto serial")
+			self.serial_controller.serial_created = False
+		else:
+			self.serial_controller.close()

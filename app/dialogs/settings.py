@@ -3,6 +3,18 @@ import wx
 from app.back_logic.config_manager import save_to_config, get_from_config
 from app.back_logic.serial_controller import list_available_serial_ports
 
+my_EVT_PORT_CHANGED = wx.NewEventType()
+EVT_PORT_CHANGED = wx.PyEventBinder(my_EVT_PORT_CHANGED, 1)
+
+
+class PortChangedEvent(wx.PyCommandEvent):
+    def __init__(self, etype, eid, port):
+        super(PortChangedEvent, self).__init__(etype, eid)
+        self.port = port
+
+    def get_port(self):
+        return self.port
+
 
 class SettingsDialog(wx.Dialog):
     def __init__(self, parent, title, controller):
@@ -16,7 +28,7 @@ class SettingsDialog(wx.Dialog):
         panel = wx.Panel(self)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
-        port_label = wx.StaticText(panel, label="Serial Port:")
+        port_label = wx.StaticText(panel, label="Puerto Serial:")
         # self.port_dropdown = wx.Choice(panel, choices=self.controller.ports)
 
         selected_port = get_from_config("serial_port")
@@ -29,8 +41,8 @@ class SettingsDialog(wx.Dialog):
         vbox.Add(self.port_dropdown, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, border=10)
 
         hbox_btn = wx.BoxSizer(wx.HORIZONTAL)
-        save_btn = wx.Button(panel, label="Save", size=(70, 30))
-        cancel_btn = wx.Button(panel, label="Cancel", size=(70, 30))
+        save_btn = wx.Button(panel, label="Guardar", size=(70, 30))
+        cancel_btn = wx.Button(panel, label="Cancelar", size=(70, 30))
         hbox_btn.Add(save_btn, flag=wx.LEFT, border=10)
         hbox_btn.Add(cancel_btn, flag=wx.LEFT, border=5)
 
@@ -43,9 +55,12 @@ class SettingsDialog(wx.Dialog):
 
     def on_save(self, event):
         selected_port = self.port_dropdown.GetStringSelection()
-        print(selected_port)
-        # self.controller.update_selected_port(selected_port)
+        print(f"Selected port from dropdown: {selected_port}")
         save_to_config("serial_port", selected_port)
+
+        evt = PortChangedEvent(my_EVT_PORT_CHANGED, -1, selected_port)
+        wx.PostEvent(self.GetParent(), evt)
+
         self.Close()
 
     def on_cancel(self, event):

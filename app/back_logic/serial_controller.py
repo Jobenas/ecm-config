@@ -55,6 +55,13 @@ class SerialController:
 			timeout=self.timeout,
 		)
 
+	def update_port(self, port: str):
+		if self.serial is None:
+			self.create_serial()
+			self.serial_created = True
+		self.port = port
+		self.serial.port = port
+
 	def open(self) -> bool:
 		if not self.is_open():
 			try:
@@ -68,12 +75,15 @@ class SerialController:
 	def close(self):
 		self.serial.close()
 
-	def is_open(self):
-		return self.serial.is_open
+	def is_open(self) -> bool:
+		try:
+			return self.serial.is_open
+		except AttributeError:
+			return False
 
 	def send_command(self, command: str) -> str:
 		self.serial.write(command.encode("utf-8"))
-		time.sleep(0.5)
+		time.sleep(1)
 		try:
 			data = self.serial.read_all()
 		except serial.Timeout:
