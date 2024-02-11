@@ -2,12 +2,13 @@ import wx
 
 from app.back_logic.config_manager import get_from_config
 from app.back_logic.serial_controller import SerialController
+from app.dir_paths import ASSETS_DIR
 from app.main_screen import MainFrame
 
 
 class App(wx.App):
 	def OnInit(self):
-		splash_image = wx.Image("./assets/logo-recortado.jpg", wx.BITMAP_TYPE_ANY).ConvertToBitmap()
+		splash_image = wx.Image(f"{ASSETS_DIR}/logo-recortado.jpg", wx.BITMAP_TYPE_ANY).ConvertToBitmap()
 		# Create a splash screen
 		splash_screen = wx.adv.SplashScreen(
 			splash_image,

@@ -6,6 +6,7 @@ import wx
 import wx.adv
 import wx.lib.agw.aui as aui
 
+from app.dir_paths import ASSETS_DIR
 from app.panels.ac_input import AcInputPanel
 from app.panels.device_status import DeviceStatusPanel
 from app.panels.digital_input import DigitalInputPanel
@@ -30,7 +31,7 @@ class MainFrame(wx.Frame):
 
 		self.serial_controller = serial_controller
 
-		icon_path = "./assets/logo.ico"
+		icon_path = f"{ASSETS_DIR}/logo.ico"
 		icon = wx.Icon(icon_path, wx.BITMAP_TYPE_ICO)
 		self.SetIcon(icon)
 
@@ -137,9 +138,9 @@ class MainFrame(wx.Frame):
 		open_port_id = wx.NewIdRef()
 		close_port_id = wx.NewIdRef()
 		ajustes_id = wx.NewIdRef()
-		self.toolbar.AddTool(open_port_id, "Abrir Puerto", wx.Bitmap("./assets/connect.ico"))
-		self.toolbar.AddTool(close_port_id, "Cerrar Puerto", wx.Bitmap("./assets/disconnect.ico"))
-		self.toolbar.AddTool(ajustes_id, "Ajustes", wx.Bitmap("./assets/settings_icon.png"))
+		self.toolbar.AddTool(open_port_id, "Abrir Puerto", wx.Bitmap(f"{ASSETS_DIR}/connect.ico"))
+		self.toolbar.AddTool(close_port_id, "Cerrar Puerto", wx.Bitmap(f"{ASSETS_DIR}/disconnect.ico"))
+		self.toolbar.AddTool(ajustes_id, "Ajustes", wx.Bitmap(f"{ASSETS_DIR}/settings_icon.png"))
 
 		self.toolbar.Realize()
 
