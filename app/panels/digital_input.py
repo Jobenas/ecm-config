@@ -76,7 +76,9 @@ class DigitalInputPanel(wx.ScrolledWindow):
 
             dlg.Destroy()
 
-            self.dc_input_info["dc_input_mode"]["text_ctrl"].SetValue(dc_input)
+            dc_input_text = "Solo alerta" if "OPENING_DETECTION" in dc_input else "Conmutación de relé"
+
+            self.dc_input_info["dc_input_mode"]["text_ctrl"].SetValue(dc_input_text)
         else:
             wx.MessageBox(
                 "No se puede leer la configuración de entrada Digital, el puerto serial no está abierto",
@@ -171,7 +173,7 @@ class DigitalInputPanel(wx.ScrolledWindow):
 
             print(f"Digital input mode: {digital_input_mode}")
 
-            self.dc_input_info["dc_input_mode"]["text_ctrl"].SetValue("TOGGLE_RELAY" if digital_input_mode == 0 else "ALERT_ONLY")
+            self.dc_input_info["dc_input_mode"]["text_ctrl"].SetValue("Conmutación de relé" if digital_input_mode == 0 else "Solo alerta")
             dlg = wx.ProgressDialog(
                 "Cargando parámetros",
                 "Por favor espere mientras se realiza la carga",
@@ -180,7 +182,7 @@ class DigitalInputPanel(wx.ScrolledWindow):
                 style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
             )
 
-            dc_config_msg = f"AT+CONFIG={digital_input_mode}0,00\r\n"
+            dc_config_msg = f"AT+CONFIG={'16' if digital_input_mode == 1 else '00'},00\r\n"
             print(f"DC config msg: {dc_config_msg}")
             response = self.serial_comms_controller.send_command(dc_config_msg)
             dlg.Update(1, "Cargando el control por horario...")

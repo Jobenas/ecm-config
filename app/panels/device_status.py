@@ -145,7 +145,7 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 			self.device_info["off_contactor_state"]["text_ctrl"].SetValue(contactor_off)
 			self.device_info["start_schedule"]["text_ctrl"].SetValue(ac_on_schedule)
 			self.device_info["end_schedule"]["text_ctrl"].SetValue(ac_off_schedule)
-			self.device_info["dc_input_mode"]["text_ctrl"].SetValue(dc_input)
+			self.device_info["dc_input_mode"]["text_ctrl"].SetValue("Solo alerta" if "OPENING_DETECTION" in dc_input else "Conmutación de relé")
 		else:
 			wx.MessageBox("No se pudo comunicar con el dispositivo")
 
