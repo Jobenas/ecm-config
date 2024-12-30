@@ -8,6 +8,8 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 		self.controller = controller
 
 		self.device_info = {
+			"network_type": {"value": "", "text_ctrl": None},
+			"device_id": {"value": "", "text_ctrl": None},
 			"pulse_count1": {"value": "", "text_ctrl": None},
 			"pulse_count2": {"value": "", "text_ctrl": None},
 			"dc_input_mode": {"value": "", "text_ctrl": None},
@@ -29,7 +31,20 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 			{
 				"rows": [
 					{
-						"type": "single-item",
+						"type": "multi-item",
+						"items": [
+							{"label": "Tipo de Red", "key": "network_type", "type": "single"},
+							{"label": "ID de Dispositivo", "key": "device_id", "type": "single"},
+						]
+					},
+				],
+				"title": "Configuración de Red",
+				"type": "multiple",
+			},
+			{
+				"rows": [
+					{
+						"type": "multi-item",
 						"items": [
 							{"label": "Cuenta de Pulsos 1", "key": "pulse_count1", "type": "single"},
 							{"label": "Cuenta de Pulsos 2", "key": "pulse_count2", "type": "single"},
@@ -108,38 +123,58 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 			dlg = wx.ProgressDialog(
 				"Leyendo parámetros",
 				"Por favor espere mientras se realiza la lectura",
-				maximum=4,
+				maximum=6,
 				parent=self,
 				style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
 			)
+			network_type = self.controller.send_command("AT+NETWORK?\r\n")
+			network_type = network_type.split("\r\n")[0].split(": ")[1]
+			print(f"Raw network type value: {network_type}")
+			match network_type:
+				case "0":
+					network_type = "Sigfox"
+				case "1":
+					network_type = "LoRaWAN"
+				case "2":
+					network_type = "Celular"
+				case _:
+					network_type = "Desconocido"
+			print(f"Network type: {network_type}")
+			dlg.Update(0, "Leyendo la configuración de red...")
+
+			device_id = self.controller.send_command("AT+DEVID?\r\n")
+			device_id = device_id.split("\r\n")[0].split(": ")[1].lstrip('0')  # Remove any leading 0 characters
+			print(f"Device ID: {device_id}")
+			dlg.Update(1, "Leyendo el ID del dispositivo...")
+
 			pulse_count_hex_str = self.controller.send_command("AT+PULSECOUNT1?\r\n")
 			print(f"Current pulse count: {pulse_count_hex_str}")
 			pulse_count_hex_str = pulse_count_hex_str.split("\r\n")[0]
 			pulse_count1 = int(pulse_count_hex_str, 16)
 			print(f"Integer pulse count: {pulse_count1}")
-			dlg.Update(1, "Leyendo la cuenta de pulsos 1...")
+			dlg.Update(2, "Leyendo la cuenta de pulsos 1...")
 
 			pulse_count_hex_str = self.controller.send_command("AT+PULSECOUNT2?\r\n")
 			print(f"Current pulse count: {pulse_count_hex_str}")
 			pulse_count_hex_str = pulse_count_hex_str.split("\r\n")[0]
 			pulse_count2 = int(pulse_count_hex_str, 16)
 			print(f"Integer pulse count: {pulse_count2}")
-			dlg.Update(1, "Leyendo la cuenta de pulsos 2...")
+			dlg.Update(3, "Leyendo la cuenta de pulsos 2...")
 
 			schedule_config = self.controller.send_command("AT+SCHEDULE?\r\n")
 			schedule_config = schedule_config.split("\r\n")[0]
 			print(f"Schedule config: {schedule_config}")
-			dlg.Update(2, "Leyendo el control por horario...")
+			dlg.Update(4, "Leyendo el control por horario...")
 
 			ac_input_schedule = self.controller.send_command("AT+ACINPUT?\r\n")
 			ac_input_schedule = ac_input_schedule.split("\r\n")[0]
 			print(f"AC input schedule: {ac_input_schedule}")
-			dlg.Update(3, "Leyendo la configuración de entrada AC...")
+			dlg.Update(5, "Leyendo la configuración de entrada AC...")
 
 			dc_input = self.controller.send_command("AT+IN3MODE?\r\n")
 			dc_input = dc_input.split("\r\n")[0]
 			print(f"DC input: {dc_input}")
-			dlg.Update(4, "Leyendo la configuración de entrada digital...")
+			dlg.Update(6, "Leyendo la configuración de entrada digital...")
 
 			dlg.Destroy()
 
@@ -155,6 +190,8 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 			ac_on_schedule = f"{ac_input_list[0]}:{ac_input_list[1]}" if ac_input_list[0] != "99" else "No configurado"
 			ac_off_schedule = f"{ac_input_list[2]}:{ac_input_list[3]}" if ac_input_list[2] != "99" else "No configurado"
 
+			self.device_info["network_type"]["text_ctrl"].SetValue(network_type)
+			self.device_info["device_id"]["text_ctrl"].SetValue(device_id)
 			self.device_info["pulse_count1"]["text_ctrl"].SetValue(str(pulse_count1))
 			self.device_info["pulse_count2"]["text_ctrl"].SetValue(str(pulse_count2))
 			self.device_info["on_schedule"]["text_ctrl"].SetValue(schedule_on)

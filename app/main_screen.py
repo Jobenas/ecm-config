@@ -1,10 +1,9 @@
-from ctypes import windll
-
-import serial
-import win32con
 import wx
 import wx.adv
 import wx.lib.agw.aui as aui
+import serial
+import win32con
+from ctypes import windll
 
 from app.dialogs.display_config import DisplayConfigDialog
 from app.dir_paths import ASSETS_DIR
@@ -14,8 +13,9 @@ from app.panels.digital_input import DigitalInputPanel
 from app.panels.schedule_config import ScheduleConfigPanel
 from app.panels.modbus_config import ModbusConfigPanel
 from app.panels.payload_config_panel import PayloadConfigPanel
-from app.dialogs.settings import SettingsDialog, EVT_PORT_CHANGED
 
+from app.back_logic.config_manager import get_from_config
+from app.dialogs.settings import SettingsDialog, EVT_PORT_CHANGED
 
 def set_taskbar_icon(frame, icon_path):
 	icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
@@ -27,7 +27,6 @@ def set_taskbar_icon(frame, icon_path):
 
 	windll.user32.SendMessageW(frame.GetHandle(), win32con.WM_SETICON, win32con.ICON_SMALL, icon_handle)
 
-
 class MainFrame(wx.Frame):
 	def __init__(self, parent, title, serial_controller):
 		super(MainFrame, self).__init__(parent, title=title, size=(800, 600))
@@ -37,7 +36,6 @@ class MainFrame(wx.Frame):
 		icon_path = f"{ASSETS_DIR}/logo.ico"
 		icon = wx.Icon(icon_path, wx.BITMAP_TYPE_ICO)
 		self.SetIcon(icon)
-
 		set_taskbar_icon(self, icon_path)
 
 		self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -72,7 +70,6 @@ class MainFrame(wx.Frame):
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(self.page_controller, 1, wx.EXPAND)
-
 		self.Bind(EVT_PORT_CHANGED, self.on_port_changed)
 
 		self.SetSizer(sizer)
@@ -81,12 +78,10 @@ class MainFrame(wx.Frame):
 		self.page_controller.Bind(aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.on_page_close)
 
 	def on_tab_changed(self, event):
-		"""
-		Called whenever the user switches to a different tab in the AuiNotebook.
-		"""
 		new_selection = event.GetSelection()
 		page = self.page_controller.GetPage(new_selection)
 
+		# If the tab is ModbusConfigPanel or PayloadConfigPanel, call on_enter
 		if isinstance(page, ModbusConfigPanel):
 			page.on_enter()
 		elif isinstance(page, PayloadConfigPanel):
@@ -111,47 +106,32 @@ class MainFrame(wx.Frame):
 			("Configuración de entrada Digital", DigitalInputPanel),
 			("Configuración de lectura Modbus", ModbusConfigPanel),
 			("Configuración de Mensaje", PayloadConfigPanel),
-			# ("Ajustes", SettingsView),
 		]
-
 		for tab_name, tab_class in tabs:
 			page = tab_class(self, self.serial_controller)
 			self.page_controller.AddPage(page, tab_name)
 
 	def setup_menu_bar(self):
-		# Create a menu bar
 		menu_bar = wx.MenuBar()
-
-		# Create a menu
 		file_menu = wx.Menu()
 
-		#create settings item
 		settings_item = wx.MenuItem(file_menu, wx.ID_ANY, "&Ajustes")
 		file_menu.Append(settings_item)
-
 		self.Bind(wx.EVT_MENU, self.on_ajustes, id=settings_item.GetId())
 
 		file_menu.AppendSeparator()
-		
-		# Create a menu item
+
 		exit_item = wx.MenuItem(file_menu, wx.ID_EXIT, "&Exit\tAlt+F4")
 		file_menu.Append(exit_item)
-
-		# Bind the menu item to a method
 		self.Bind(wx.EVT_MENU, self.on_close, id=wx.ID_EXIT)
 
 		help_menu = wx.Menu()
-
 		about_item = wx.MenuItem(help_menu, wx.ID_ANY, "&Acerca de")
 		help_menu.Append(about_item)
-
 		self.Bind(wx.EVT_MENU, self.on_about, id=about_item.GetId())
 
-		# Add the menu to the menu bar
 		menu_bar.Append(file_menu, "&Archivo")
 		menu_bar.Append(help_menu, "&Ayuda")
-
-		# Set the menu bar for the frame
 		self.SetMenuBar(menu_bar)
 
 	def setup_toolbar(self):
@@ -159,6 +139,7 @@ class MainFrame(wx.Frame):
 		close_port_id = wx.NewIdRef()
 		display_config_id = wx.NewIdRef()
 		ajustes_id = wx.NewIdRef()
+
 		self.toolbar.AddTool(open_port_id, "Abrir Puerto", wx.Bitmap(f"{ASSETS_DIR}/connect.ico"))
 		self.toolbar.AddTool(close_port_id, "Cerrar Puerto", wx.Bitmap(f"{ASSETS_DIR}/disconnect.ico"))
 		self.toolbar.AddTool(display_config_id, "Configurar Display externo", wx.Bitmap(f"{ASSETS_DIR}/display.ico"))
@@ -170,9 +151,6 @@ class MainFrame(wx.Frame):
 		self.Bind(wx.EVT_TOOL, self.on_close_port, id=close_port_id)
 		self.Bind(wx.EVT_TOOL, self.on_display_config, id=display_config_id)
 		self.Bind(wx.EVT_TOOL, self.on_ajustes, id=ajustes_id)
-
-		self.Bind(wx.EVT_TOOL, self.on_open_port, id=open_port_id)
-		self.Bind(wx.EVT_TOOL, self.on_close_port, id=close_port_id)
 
 	def on_ajustes(self, event):
 		dialog = SettingsDialog(self, "Settings", self.serial_controller)
@@ -186,7 +164,7 @@ class MainFrame(wx.Frame):
 
 	def on_about(self, event):
 		wx.MessageBox(
-			"ECM Config v1.0.0\n\n"
+			"ECM Config v1.1.0\n\n"
 			"Desarrollado por:\n\n"
 			"- Jorge Benavides Aspiazu\n\n\n"
 			"\t2024 Energy Automation Technologies, todos los derechos reservados."
@@ -203,6 +181,7 @@ class MainFrame(wx.Frame):
 				self.serial_controller.serial_created = True
 			except serial.SerialException:
 				wx.MessageBox("Puerto Serial no disponible, seleccione otro")
+
 		self.update_port_status()
 
 	def on_close_port(self, event):
@@ -212,9 +191,17 @@ class MainFrame(wx.Frame):
 				  f"{'open' if self.serial_controller.is_open() else 'closed'}")
 		else:
 			wx.MessageBox("Puerto Serial no disponible, seleccione otro")
+
 		self.update_port_status()
 
 	def update_port_status(self):
+		"""
+		Updates the toolbar text to reflect whether the port is open or closed,
+		and which port is selected.
+		"""
+		# Update the "Puerto: XXX" label
+		self.selected_port.SetLabel(f"Puerto: {self.serial_controller.port}")
+
 		try:
 			if self.serial_controller.is_open():
 				self.port_status.SetLabel("ABIERTO")
@@ -225,16 +212,34 @@ class MainFrame(wx.Frame):
 		except serial.SerialException:
 			self.port_status.SetLabel("NO DISPONIBLE")
 			self.port_status.SetForegroundColour(wx.RED)
+
 		self.toolbar.Realize()
 
 	def on_port_changed(self, event):
+		"""
+		Called when the SettingsDialog is closed and the user saved changes to
+		port or baud rate. We'll use the new port, re-open it immediately (if possible),
+		and refresh the toolbar text.
+		"""
 		new_port = event.get_port()
+
+		# The user might also have changed baud rate, so re-check config:
+		new_baud_rate = get_from_config("baud_rate")
+		if new_baud_rate is not None:
+			self.serial_controller.update_baud_rate(int(new_baud_rate))
+
+		# Update the port in the controller
 		self.serial_controller.update_port(new_port)
 
+		# Attempt to open the port immediately with the new settings
 		if not self.serial_controller.is_open():
 			if not self.serial_controller.open():
-				wx.MessageBox("No se pudo abrir el puerto serial")
+				wx.MessageBox("No se pudo abrir el puerto serial con la nueva configuración.")
 				self.serial_controller.serial_created = False
 		else:
+			# If it was already open with an old port, close and re-open
 			self.serial_controller.close()
 			self.serial_controller.open()
+
+		# Now reflect the changes on the toolbar
+		self.update_port_status()

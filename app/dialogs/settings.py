@@ -21,7 +21,6 @@ class SettingsDialog(wx.Dialog):
         super(SettingsDialog, self).__init__(parent, title=title, size=(400, 200))
 
         self.controller = controller
-
         self.init_ui()
 
     def init_ui(self):
@@ -29,13 +28,12 @@ class SettingsDialog(wx.Dialog):
 
         vbox = wx.BoxSizer(wx.VERTICAL)
         port_label = wx.StaticText(panel, label="Puerto Serial:")
-        # self.port_dropdown = wx.Choice(panel, choices=self.controller.ports)
 
         selected_port = get_from_config("serial_port")
 
         available_ports = list_available_serial_ports()
         self.port_dropdown = wx.Choice(panel, choices=available_ports)
-        self.port_dropdown.SetStringSelection(selected_port if selected_port is not None else "")
+        self.port_dropdown.SetStringSelection(selected_port if selected_port else "")
         vbox.Add(port_label, flag=wx.EXPAND | wx.LEFT | wx.TOP, border=10)
         vbox.Add(self.port_dropdown, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, border=10)
 
@@ -43,7 +41,7 @@ class SettingsDialog(wx.Dialog):
         selected_baud_rate = get_from_config("baud_rate")
         baud_rate_choices = ["9600", "14400", "19200", "38400", "57600", "115200"]
         self.baud_rate_dropdown = wx.Choice(panel, choices=baud_rate_choices)
-        self.baud_rate_dropdown.SetStringSelection(selected_baud_rate if selected_baud_rate is not None else "9600")
+        self.baud_rate_dropdown.SetStringSelection(selected_baud_rate if selected_baud_rate else "9600")
         vbox.Add(baud_rate_label, flag=wx.EXPAND | wx.LEFT | wx.TOP, border=10)
         vbox.Add(self.baud_rate_dropdown, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, border=10)
 
@@ -61,13 +59,21 @@ class SettingsDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self.on_cancel, cancel_btn)
 
     def on_save(self, event):
+        """
+        Called when the user clicks "Guardar". We save the selected port + baud rate,
+        update the controller’s baud rate, and fire our custom event to notify the parent.
+        """
         selected_port = self.port_dropdown.GetStringSelection()
         selected_baud_rate = self.baud_rate_dropdown.GetStringSelection()
+
+        # Save to config
         save_to_config("serial_port", selected_port)
         save_to_config("baud_rate", selected_baud_rate)
 
+        # Update the controller's baud rate so the next open uses it
         self.controller.update_baud_rate(int(selected_baud_rate))
 
+        # Fire our custom event so MainFrame can react
         evt = PortChangedEvent(my_EVT_PORT_CHANGED, -1, selected_port)
         wx.PostEvent(self.GetParent(), evt)
 
