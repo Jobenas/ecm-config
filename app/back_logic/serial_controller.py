@@ -55,6 +55,18 @@ class SerialController:
 			timeout=self.timeout,
 		)
 
+	def update_baud_rate(self, baud_rate):
+		self.baudrate = baud_rate
+		if self.serial_created:
+			self.serial.baudrate = baud_rate
+
+	def update_port(self, port: str):
+		if self.serial is None:
+			self.create_serial()
+			self.serial_created = True
+		self.port = port
+		self.serial.port = port
+
 	def open(self) -> bool:
 		if not self.is_open():
 			try:
@@ -68,18 +80,28 @@ class SerialController:
 	def close(self):
 		self.serial.close()
 
-	def is_open(self):
-		return self.serial.is_open
+	def is_open(self) -> bool:
+		try:
+			return self.serial.is_open
+		except AttributeError:
+			return False
 
-	def send_command(self, command: str) -> str:
+	def send_command(self, command: str, return_str: bool = True) -> str | bytes:
 		self.serial.write(command.encode("utf-8"))
-		time.sleep(0.5)
+		time.sleep(1)
 		try:
 			data = self.serial.read_all()
 		except serial.Timeout:
 			data = ""
 
-		return data.decode("utf-8")
+		print(f"received data: {data}")
+
+		return data.decode("utf-8") if return_str else data
+
+	def flush_buffer(self):
+		self.serial.reset_input_buffer()
+		self.serial.reset_output_buffer()
+		self.serial.flush()
 
 
 

@@ -8,12 +8,10 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
         self.serial_comms_controller = serial_comms_controller
 
         self.schedule_info = {
-            "open_hour": "",
-            "open_minute": "",
-            "open_relay_status": "",
-            "close_hour": "",
-            "close_minute": "",
-            "close_relay_status": "",
+            "on_schedule": {"value": "", "text_ctrl": None},
+            "off_schedule": {"value": "", "text_ctrl": None},
+            "on_contactor_state": {"value": "", "text_ctrl": None},
+            "off_contactor_state": {"value": "", "text_ctrl": None},
         }
 
         self.current_open_hour = 0
@@ -30,17 +28,32 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
     def init_ui(self):
         sizer = wx.BoxSizer(wx.VERTICAL)
 
+        rows = [
+            {
+                "rows": [
+                    {
+                        "type": "multi-item",
+                        "items": [
+                            {"label": "Horario de encendido", "key": "on_schedule", "type": "single"},
+                            {"label": "Estado de contactor (encendido)", "key": "on_contactor_state", "type": "single"}
+                        ],
+                    },
+                    {
+                        "type": "multi-item",
+                        "items": [
+                            {"label": "Horario de apagado", "key": "off_schedule", "type": "single"},
+                            {"label": "Estado de contactor (apagado)", "key": "off_contactor_state", "type": "single"}
+                        ],
+                    }
+                ],
+                "title": "Control por Horario",
+                "type": "multiple"
+            },
+        ]
+
         sizer.Add(self.create_title("Configuración Actual"))
-        sizer.Add(
-            self.create_card(
-                "Horario de encendido", "open_hour", "open_minute", "open_relay_status"
-            )
-        )
-        sizer.Add(
-            self.create_card(
-                "Horario de apagado", "close_hour", "close_minute", "close_relay_status"
-            )
-        )
+        for row in rows:
+            sizer.Add(self.create_card(row['title'], row["rows"]))
 
         sizer.AddSpacer(20)
 
@@ -63,7 +76,44 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
         self.SetSizer(sizer)
 
     def on_read(self, event):
-        print("This is where we read the schedule config")
+        if self.serial_comms_controller.is_open():
+            self.serial_comms_controller.send_command("AT+PROGMODE=1\r\n", False)
+            dlg = wx.ProgressDialog(
+                "Leyendo parámetros",
+                "Por favor espere mientras se realiza la lectura",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
+            schedule_config = self.serial_comms_controller.send_command("AT+SCHEDULE?\r\n")
+            schedule_config = schedule_config.replace("OK\r\n", "")
+            print(f"Schedule config: {schedule_config}")
+            dlg.Update(1, "Leyendo el control por horario...")
+
+            dlg.Destroy()
+            self.serial_comms_controller.send_command("AT+PROGMODE=0\r\n", False)
+
+            schedule_config_list = schedule_config[:-2].split(",")
+            schedule_on = f"{schedule_config_list[0]}:{schedule_config_list[1]}" if schedule_config_list[
+                                                                                        0] != "99" else "No configurado"
+            schedule_off = f"{schedule_config_list[3]}:{schedule_config_list[4]}" if schedule_config_list[
+                                                                                         3] != "99" else "No configurado"
+            contactor_on = ("Cerrado" if schedule_config_list[
+                                             2] == "1" else "Abierto") if schedule_on != "No configurado" else "No configurado"
+            contactor_off = ("Abierto" if schedule_config_list[
+                                              2] == "1" else "Cerrado") if schedule_off != "No configurado" else "No configurado"
+
+            self.schedule_info["on_schedule"]["text_ctrl"].SetValue(schedule_on)
+            self.schedule_info["off_schedule"]["text_ctrl"].SetValue(schedule_off)
+            self.schedule_info["on_contactor_state"]["text_ctrl"].SetValue(contactor_on)
+            self.schedule_info["off_contactor_state"]["text_ctrl"].SetValue(contactor_off)
+
+        else:
+            wx.MessageBox(
+                "No se puede leer la configuración de horario, el puerto serial está cerrado",
+                "Error",
+                wx.OK | wx.ICON_ERROR
+            )
 
     def create_title(self, title):
         title_text = wx.StaticText(self, label=title)
@@ -85,39 +135,35 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
 
         return v_sizer
 
-    def create_card(self, title, hour_key, minute_key, relay_status_key):
-        box = wx.StaticBox(self, label=title)
-        font = wx.Font(9, wx.DEFAULT, wx.NORMAL, wx.BOLD)
+    def create_card(self, title, rows):
+        box = wx.StaticBox(self, label=title, size=(300, -1))  # Set a fixed width for the box
+        font = wx.Font(11, wx.DEFAULT, wx.NORMAL, wx.BOLD)
         box.SetFont(font)
-        sizer = wx.StaticBoxSizer(box, wx.HORIZONTAL)  # Change to horizontal sizer
+        sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
 
-        # label = wx.StaticText(self, label=f"{title}:")
-        # label.SetFont(wx.Font(wx.FontInfo(12).Bold()))
-        hour_label = wx.StaticText(
-            self,
-            label=f"Hora: {self.schedule_info[hour_key]}:{self.schedule_info[minute_key]}",
-        )
-        relay_status_label = wx.StaticText(
-            self,
-            label=f"Tipo de contacto: {self.get_relay_status_text(relay_status_key)}",
-        )
+        for row in rows:
+            items = row["items"]
 
-        # sizer.Add(label, flag=wx.ALL, border=5)
-        sizer.Add(hour_label, flag=wx.EXPAND | wx.ALL, border=5)
-        sizer.Add(relay_status_label, flag=wx.EXPAND | wx.ALL, border=5)
+            grid_sizer = wx.GridSizer(rows=len(items), cols=2, vgap=5,
+                                      hgap=5)  # Adjust the number of rows in the GridSizer
 
-        # Create a horizontal box sizer
+            for item in items:
+                key = item['key']
+                label = wx.StaticText(self, label=item["label"])
+                grid_sizer.Add(label, flag=wx.ALL, border=5)
+                text_ctrl = wx.TextCtrl(self, value=str(self.schedule_info[key]['value']),
+                                        style=wx.TE_READONLY, size=(50, -1))
+                self.schedule_info[key]["text_ctrl"] = text_ctrl
+                grid_sizer.Add(text_ctrl, flag=wx.EXPAND | wx.ALL, border=5)
+
+            sizer.Add(grid_sizer, flag=wx.EXPAND)
+
         h_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        # Add a spacer to the left of the sizer
-        h_sizer.Add((20, 0))  # 20 is the width of the spacer, adjust as needed
-        # Add the original sizer to the horizontal sizer
+        h_sizer.Add((20, 0))
         h_sizer.Add(sizer, 1, flag=wx.EXPAND)
 
-        # Create a vertical box sizer
         v_sizer = wx.BoxSizer(wx.VERTICAL)
-        # Add a spacer to the top of the sizer
-        v_sizer.Add((0, 20))  # 20 is the height of the spacer, adjust as needed
-        # Add the horizontal sizer to the vertical sizer
+        v_sizer.Add((0, 20))
         v_sizer.Add(h_sizer, 1, flag=wx.EXPAND)
 
         return v_sizer
@@ -185,26 +231,51 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
         return v_sizer
 
     def on_save(self, event):
-        open_hour = str(self.current_open_hour).zfill(2)
-        open_minute = str(self.current_open_minute).zfill(2)
-        open_relay_status = "1" if self.current_open_contact == "NA" else "0"
-        close_hour = str(self.current_close_hour).zfill(2)
-        close_minute = str(self.current_close_minute).zfill(2)
-        close_relay_status = "1" if self.current_close_contact == "NA" else "0"
+        if self.serial_comms_controller.is_open():
+            self.serial_comms_controller.send_command("AT+PROGMODE=1\r\n", False)
+            open_hour = str(self.current_open_hour).zfill(2)
+            open_minute = str(self.current_open_minute).zfill(2)
+            open_relay_status = "1" if self.current_open_contact == "NA" else "0"
+            close_hour = str(self.current_close_hour).zfill(2)
+            close_minute = str(self.current_close_minute).zfill(2)
+            close_relay_status = "1" if self.current_close_contact == "NA" else "0"
 
-        schedule_info = {
-            "open_hour": open_hour,
-            "open_minute": open_minute,
-            "open_relay_status": open_relay_status,
-            "close_hour": close_hour,
-            "close_minute": close_minute,
-            "close_relay_status": close_relay_status,
-        }
+            self.schedule_info["on_schedule"]["value"] = f"{open_hour}:{open_minute}"
+            self.schedule_info["off_schedule"]["value"] = f"{close_hour}:{close_minute}"
+            self.schedule_info["on_contactor_state"]["value"] = open_relay_status
+            self.schedule_info["off_contactor_state"]["value"] = close_relay_status
 
-        self.schedule_info = schedule_info
-        # Add logic to save to serial controller or perform other actions
+            dlg = wx.ProgressDialog(
+                "Cargando parámetros",
+                "Por favor espere mientras se realiza la carga",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
 
-        wx.MessageBox("Values saved!", "Info", wx.OK | wx.ICON_INFORMATION)
+            # Add logic to save to serial controller or perform other actions
+            schedule_config_msg = f"AT+SCHEDULE={open_hour},{open_minute},{open_relay_status},{close_hour},{close_minute},{close_relay_status}\r\n"
+            print(f"Schedule config message: {schedule_config_msg}")
+            response = self.serial_comms_controller.send_command(schedule_config_msg)
+            dlg.Update(1, "Cargando el control por horario...")
+
+            dlg.Destroy()
+            self.serial_comms_controller.send_command("AT+PROGMODE=0\r\n", False)
+
+            if response == "OK\r\n":
+                wx.MessageBox("Valores cargados correctamente", "Info", wx.OK | wx.ICON_INFORMATION)
+            else:
+                wx.MessageBox(
+                    f"No se pudieron guardar los valores",
+                    "Error",
+                    wx.OK | wx.ICON_ERROR,
+                )
+        else:
+            wx.MessageBox(
+                "No se puede guardar la configuración de horario, el puerto serial está cerrado",
+                "Error",
+                wx.OK | wx.ICON_ERROR
+            )
 
     def get_schedule_text(self, hour_key, minute_key, relay_status_key):
         return (
