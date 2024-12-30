@@ -6,11 +6,14 @@ import wx
 import wx.adv
 import wx.lib.agw.aui as aui
 
+from app.dialogs.display_config import DisplayConfigDialog
 from app.dir_paths import ASSETS_DIR
 from app.panels.ac_input import AcInputPanel
 from app.panels.device_status import DeviceStatusPanel
 from app.panels.digital_input import DigitalInputPanel
 from app.panels.schedule_config import ScheduleConfigPanel
+from app.panels.modbus_config import ModbusConfigPanel
+from app.panels.payload_config_panel import PayloadConfigPanel
 from app.dialogs.settings import SettingsDialog, EVT_PORT_CHANGED
 
 
@@ -40,6 +43,7 @@ class MainFrame(wx.Frame):
 		self.Bind(wx.EVT_CLOSE, self.on_close)
 
 		self.page_controller = aui.AuiNotebook(self)
+		self.page_controller.Bind(aui.EVT_AUINOTEBOOK_PAGE_CHANGED, self.on_tab_changed)
 
 		self.setup_menu_bar()
 
@@ -76,6 +80,20 @@ class MainFrame(wx.Frame):
 
 		self.page_controller.Bind(aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.on_page_close)
 
+	def on_tab_changed(self, event):
+		"""
+		Called whenever the user switches to a different tab in the AuiNotebook.
+		"""
+		new_selection = event.GetSelection()
+		page = self.page_controller.GetPage(new_selection)
+
+		if isinstance(page, ModbusConfigPanel):
+			page.on_enter()
+		elif isinstance(page, PayloadConfigPanel):
+			page.on_enter()
+
+		event.Skip()
+
 	def on_page_close(self, event):
 		# Prevent the tab from closing
 		event.Veto()
@@ -91,6 +109,8 @@ class MainFrame(wx.Frame):
 			("Configuración de horarios", ScheduleConfigPanel),
 			("Configuración de entrada de AC", AcInputPanel),
 			("Configuración de entrada Digital", DigitalInputPanel),
+			("Configuración de lectura Modbus", ModbusConfigPanel),
+			("Configuración de Mensaje", PayloadConfigPanel),
 			# ("Ajustes", SettingsView),
 		]
 
@@ -137,15 +157,18 @@ class MainFrame(wx.Frame):
 	def setup_toolbar(self):
 		open_port_id = wx.NewIdRef()
 		close_port_id = wx.NewIdRef()
+		display_config_id = wx.NewIdRef()
 		ajustes_id = wx.NewIdRef()
 		self.toolbar.AddTool(open_port_id, "Abrir Puerto", wx.Bitmap(f"{ASSETS_DIR}/connect.ico"))
 		self.toolbar.AddTool(close_port_id, "Cerrar Puerto", wx.Bitmap(f"{ASSETS_DIR}/disconnect.ico"))
+		self.toolbar.AddTool(display_config_id, "Configurar Display externo", wx.Bitmap(f"{ASSETS_DIR}/display.ico"))
 		self.toolbar.AddTool(ajustes_id, "Ajustes", wx.Bitmap(f"{ASSETS_DIR}/settings_icon.png"))
 
 		self.toolbar.Realize()
 
 		self.Bind(wx.EVT_TOOL, self.on_open_port, id=open_port_id)
 		self.Bind(wx.EVT_TOOL, self.on_close_port, id=close_port_id)
+		self.Bind(wx.EVT_TOOL, self.on_display_config, id=display_config_id)
 		self.Bind(wx.EVT_TOOL, self.on_ajustes, id=ajustes_id)
 
 		self.Bind(wx.EVT_TOOL, self.on_open_port, id=open_port_id)
@@ -153,6 +176,11 @@ class MainFrame(wx.Frame):
 
 	def on_ajustes(self, event):
 		dialog = SettingsDialog(self, "Settings", self.serial_controller)
+		dialog.ShowModal()
+		dialog.Destroy()
+
+	def on_display_config(self, event):
+		dialog = DisplayConfigDialog(self, "Configurar display", self.serial_controller)
 		dialog.ShowModal()
 		dialog.Destroy()
 
@@ -203,8 +231,10 @@ class MainFrame(wx.Frame):
 		new_port = event.get_port()
 		self.serial_controller.update_port(new_port)
 
-		if not self.serial_controller.open():
-			wx.MessageBox("No se pudo abrir el puerto serial")
-			self.serial_controller.serial_created = False
+		if not self.serial_controller.is_open():
+			if not self.serial_controller.open():
+				wx.MessageBox("No se pudo abrir el puerto serial")
+				self.serial_controller.serial_created = False
 		else:
 			self.serial_controller.close()
+			self.serial_controller.open()

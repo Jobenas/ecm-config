@@ -77,6 +77,7 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
 
     def on_read(self, event):
         if self.serial_comms_controller.is_open():
+            self.serial_comms_controller.send_command("AT+PROGMODE=1\r\n", False)
             dlg = wx.ProgressDialog(
                 "Leyendo parámetros",
                 "Por favor espere mientras se realiza la lectura",
@@ -85,10 +86,12 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
                 style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
             )
             schedule_config = self.serial_comms_controller.send_command("AT+SCHEDULE?\r\n")
+            schedule_config = schedule_config.replace("OK\r\n", "")
             print(f"Schedule config: {schedule_config}")
             dlg.Update(1, "Leyendo el control por horario...")
 
             dlg.Destroy()
+            self.serial_comms_controller.send_command("AT+PROGMODE=0\r\n", False)
 
             schedule_config_list = schedule_config[:-2].split(",")
             schedule_on = f"{schedule_config_list[0]}:{schedule_config_list[1]}" if schedule_config_list[
@@ -229,6 +232,7 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
 
     def on_save(self, event):
         if self.serial_comms_controller.is_open():
+            self.serial_comms_controller.send_command("AT+PROGMODE=1\r\n", False)
             open_hour = str(self.current_open_hour).zfill(2)
             open_minute = str(self.current_open_minute).zfill(2)
             open_relay_status = "1" if self.current_open_contact == "NA" else "0"
@@ -256,6 +260,7 @@ class ScheduleConfigPanel(wx.ScrolledWindow):
             dlg.Update(1, "Cargando el control por horario...")
 
             dlg.Destroy()
+            self.serial_comms_controller.send_command("AT+PROGMODE=0\r\n", False)
 
             if response == "OK\r\n":
                 wx.MessageBox("Valores cargados correctamente", "Info", wx.OK | wx.ICON_INFORMATION)

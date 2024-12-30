@@ -8,7 +8,8 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 		self.controller = controller
 
 		self.device_info = {
-			"pulse_count": {"value": "", "text_ctrl": None},
+			"pulse_count1": {"value": "", "text_ctrl": None},
+			"pulse_count2": {"value": "", "text_ctrl": None},
 			"dc_input_mode": {"value": "", "text_ctrl": None},
 			"on_schedule": {"value": "", "text_ctrl": None},
 			"off_schedule": {"value": "", "text_ctrl": None},
@@ -30,11 +31,12 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 					{
 						"type": "single-item",
 						"items": [
-							{"label": "Cuenta de Pulsos", "key": "pulse_count", "type": "single"},
+							{"label": "Cuenta de Pulsos 1", "key": "pulse_count1", "type": "single"},
+							{"label": "Cuenta de Pulsos 2", "key": "pulse_count2", "type": "single"},
 						],
 					},
 				],
-				"title": "Cuenta de Pulsos Actual",
+				"title": "Cuentas de Pulsos Actuales",
 				"type": "multiple"
 			},
 			{
@@ -101,6 +103,8 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 
 	def on_read(self, event):
 		if self.controller.is_open():
+			self.controller.send_command("AT+PROGMODE=1\r\n", False)  # entering programming mode to stop the device
+			# from sending data via Modbus
 			dlg = wx.ProgressDialog(
 				"Leyendo parámetros",
 				"Por favor espere mientras se realiza la lectura",
@@ -108,25 +112,38 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 				parent=self,
 				style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
 			)
-			pulse_count_hex_str = self.controller.send_command("AT+ACTIVEPULSES?\r\n")
+			pulse_count_hex_str = self.controller.send_command("AT+PULSECOUNT1?\r\n")
 			print(f"Current pulse count: {pulse_count_hex_str}")
-			pulse_count = int(pulse_count_hex_str, 16)
-			print(f"Integer pulse count: {pulse_count}")
-			dlg.Update(1, "Leyendo la cuenta de pulsos...")
+			pulse_count_hex_str = pulse_count_hex_str.split("\r\n")[0]
+			pulse_count1 = int(pulse_count_hex_str, 16)
+			print(f"Integer pulse count: {pulse_count1}")
+			dlg.Update(1, "Leyendo la cuenta de pulsos 1...")
+
+			pulse_count_hex_str = self.controller.send_command("AT+PULSECOUNT2?\r\n")
+			print(f"Current pulse count: {pulse_count_hex_str}")
+			pulse_count_hex_str = pulse_count_hex_str.split("\r\n")[0]
+			pulse_count2 = int(pulse_count_hex_str, 16)
+			print(f"Integer pulse count: {pulse_count2}")
+			dlg.Update(1, "Leyendo la cuenta de pulsos 2...")
 
 			schedule_config = self.controller.send_command("AT+SCHEDULE?\r\n")
+			schedule_config = schedule_config.split("\r\n")[0]
 			print(f"Schedule config: {schedule_config}")
 			dlg.Update(2, "Leyendo el control por horario...")
 
 			ac_input_schedule = self.controller.send_command("AT+ACINPUT?\r\n")
+			ac_input_schedule = ac_input_schedule.split("\r\n")[0]
 			print(f"AC input schedule: {ac_input_schedule}")
 			dlg.Update(3, "Leyendo la configuración de entrada AC...")
 
 			dc_input = self.controller.send_command("AT+IN3MODE?\r\n")
+			dc_input = dc_input.split("\r\n")[0]
 			print(f"DC input: {dc_input}")
 			dlg.Update(4, "Leyendo la configuración de entrada digital...")
 
 			dlg.Destroy()
+
+			self.controller.send_command("AT+PROGMODE=0\r\n", False)  # exiting programming mode to start the device
 
 			schedule_config_list = schedule_config[:-2].split(",")
 			schedule_on = f"{schedule_config_list[0]}:{schedule_config_list[1]}" if schedule_config_list[0] != "99" else "No configurado"
@@ -138,7 +155,8 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 			ac_on_schedule = f"{ac_input_list[0]}:{ac_input_list[1]}" if ac_input_list[0] != "99" else "No configurado"
 			ac_off_schedule = f"{ac_input_list[2]}:{ac_input_list[3]}" if ac_input_list[2] != "99" else "No configurado"
 
-			self.device_info["pulse_count"]["text_ctrl"].SetValue(str(pulse_count))
+			self.device_info["pulse_count1"]["text_ctrl"].SetValue(str(pulse_count1))
+			self.device_info["pulse_count2"]["text_ctrl"].SetValue(str(pulse_count2))
 			self.device_info["on_schedule"]["text_ctrl"].SetValue(schedule_on)
 			self.device_info["off_schedule"]["text_ctrl"].SetValue(schedule_off)
 			self.device_info["on_contactor_state"]["text_ctrl"].SetValue(contactor_on)

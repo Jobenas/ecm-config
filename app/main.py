@@ -23,7 +23,8 @@ class App(wx.App):
 
 	def setup_main_frame(self):
 		selected_port = get_from_config("serial_port")
-		comms_controller = SerialController(selected_port)
+		baudrate = get_from_config("baud_rate")
+		comms_controller = SerialController(selected_port, baudrate=baudrate)
 		frame = MainFrame(None, "ECM Config", comms_controller)
 		frame.Show(True)
 		self.SetTopWindow(frame)

@@ -1,29 +1,38 @@
 import json
 import os
 
-path = os.path.dirname(os.path.abspath(__file__))
-
 
 def save_to_config(key: str, value: str):
-	print(f"Current path: {path}")
-	if os.path.exists("config.json"):
-		with open("config.json", "r") as config_file:
-			config_data = json.load(config_file)
+    home_dir = os.path.expanduser('~')
+    config_dir = os.path.join(home_dir, 'ECMConfig')
 
-		config_data[key] = value
-	else:
-		config_data = {key: value}
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
 
-	with open("config.json", "w") as config_file:
-		json.dump(config_data, config_file)
+    config_file_path = os.path.join(config_dir, 'config.json')
+
+    if os.path.exists(config_file_path):
+        with open(config_file_path, 'r') as config_file:
+            config_data = json.load(config_file)
+    else:
+        config_data = {}
+
+    config_data[key] = value
+
+    with open(config_file_path, 'w') as config_file:
+        json.dump(config_data, config_file, indent=4)
 
 
 def get_from_config(key: str):
-	if os.path.exists("config.json"):
-		with open("config.json", "r") as config_file:
-			config_data = json.load(config_file)
+    home_dir = os.path.expanduser('~')
+    config_dir = os.path.join(home_dir, 'ECMConfig')
+    config_file_path = os.path.join(config_dir, 'config.json')
 
-		if key in config_data:
-			return config_data[key]
+    if os.path.exists(config_file_path):
+        with open(config_file_path, 'r') as config_file:
+            config_data = json.load(config_file)
 
-	return None
+            if key in config_data:
+                return config_data[key]
+
+    return None

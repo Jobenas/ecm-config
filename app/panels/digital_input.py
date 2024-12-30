@@ -62,6 +62,7 @@ class DigitalInputPanel(wx.ScrolledWindow):
 
     def on_read(self, event):
         if self.serial_comms_controller.is_open():
+            self.serial_comms_controller.send_command("AT+PROGMODE=1\r\n", False)
             dlg = wx.ProgressDialog(
                 "Leyendo parámetros",
                 "Por favor espere mientras se realiza la lectura",
@@ -75,6 +76,7 @@ class DigitalInputPanel(wx.ScrolledWindow):
             dlg.Update(1, "Leyendo la configuración de entrada digital...")
 
             dlg.Destroy()
+            self.serial_comms_controller.send_command("AT+PROGMODE=0\r\n", False)
 
             dc_input_text = "Solo alerta" if "OPENING_DETECTION" in dc_input else "Conmutación de relé"
 
@@ -167,6 +169,7 @@ class DigitalInputPanel(wx.ScrolledWindow):
 
     def on_save(self, event):
         if self.serial_comms_controller.is_open():
+            self.serial_comms_controller.send_command("AT+PROGMODE=1\r\n", False)
             digital_input_mode = (
                 1 if self.current_digital_input_mode == "Solo alerta" else 0
             )
@@ -188,6 +191,7 @@ class DigitalInputPanel(wx.ScrolledWindow):
             dlg.Update(1, "Cargando el control por horario...")
 
             dlg.Destroy()
+            self.serial_comms_controller.send_command("AT+PROGMODE=0\r\n", False)
 
             if response == "OK\r\n":
                 wx.MessageBox(
