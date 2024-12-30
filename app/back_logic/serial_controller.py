@@ -29,7 +29,7 @@ class SerialController:
 			timeout: float = 5.0,
 	):
 		self.port = port
-		self.baudrate = baudrate
+		self.baudrate = baudrate if baudrate is not None else 9600  # set default baud rate to 9600
 		self.byte_size = byte_size
 		self.parity = parity
 		self.stop_bits = stop_bits
