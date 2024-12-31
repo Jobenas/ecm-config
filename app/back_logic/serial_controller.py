@@ -96,7 +96,12 @@ class SerialController:
 
 		print(f"received data: {data}")
 
-		return data.decode("utf-8") if return_str else data
+		try:
+			final_data = data.decode("utf-8") if return_str else data
+		except UnicodeDecodeError:
+			final_data = data
+
+		return final_data
 
 	def flush_buffer(self):
 		self.serial.reset_input_buffer()
