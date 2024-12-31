@@ -1,5 +1,4 @@
 import time
-
 import wx
 
 
@@ -8,7 +7,10 @@ class ModbusConfigPanel(wx.ScrolledWindow):
         super().__init__(parent)
         self.controller = modbus_controller
 
-        # We'll start with an empty modbus_info; you can populate it later
+        # We'll store an address for the slave, e.g., "1"
+        self.slave_address_value = ""
+
+        # We'll store the list of rows for the modbus registers
         self.modbus_info = []
 
         self.data_type_choices = [
@@ -18,34 +20,66 @@ class ModbusConfigPanel(wx.ScrolledWindow):
         ]
         self.cumulative_choices = ["instantanea", "acumulado"]
 
-        # This will hold references to all controls for enabling/disabling, etc.
-        # Each element of row_controls is a dict representing one row's widgets.
+        # This will hold references to row controls for enabling/disabling, etc.
         self.row_controls = []
 
         self.init_ui()
+        # Make it scrollable
         self.SetScrollRate(5, 5)
 
     def init_ui(self):
         main_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Title
+        # ----- Title -----
         main_sizer.Add(
             self.create_title("Configuración de registros Modbus"),
             flag=wx.EXPAND | wx.ALL,
             border=5
         )
 
-        # Create a FlexGridSizer for both the header row and data rows.
+        # ====================
+        #  CARD #1: Slave Address
+        # ====================
+        slave_box = wx.StaticBox(self, label="Dirección de Slave Modbus")
+        slave_box_sizer = wx.StaticBoxSizer(slave_box, wx.VERTICAL)
+
+        # We'll place the label, textctrl, and "Actualizar" horizontally
+        slave_hsizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        slave_label = wx.StaticText(self, label="Dirección de slave:")
+        slave_hsizer.Add(slave_label, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
+
+        # TextCtrl to hold the slave address
+        self.slave_address_ctrl = wx.TextCtrl(self, value=self.slave_address_value, size=(60, -1))
+        slave_hsizer.Add(self.slave_address_ctrl, flag=wx.RIGHT, border=10)
+
+        # Button for updating the slave address
+        slave_update_btn = wx.Button(self, label="Actualizar")
+        slave_update_btn.Bind(wx.EVT_BUTTON, self.on_slave_update)
+        slave_hsizer.Add(slave_update_btn, flag=wx.LEFT, border=5)
+
+        slave_box_sizer.Add(slave_hsizer, flag=wx.ALL, border=10)
+
+        # Add the entire "Card #1" to the main_sizer
+        main_sizer.Add(slave_box_sizer, flag=wx.EXPAND | wx.ALL, border=5)
+
+        # ====================
+        #  CARD #2: Modbus Register Table
+        # ====================
+        regs_box = wx.StaticBox(self, label="Registros Modbus")
+        regs_box_sizer = wx.StaticBoxSizer(regs_box, wx.VERTICAL)
+
+        # Inside this card, we have the table (headers + data rows).
+        # Create a FlexGridSizer for table
         self.table_sizer = wx.FlexGridSizer(rows=0, cols=8, hgap=5, vgap=5)
-        # Example: Let column #2 expand if needed
-        self.table_sizer.AddGrowableCol(2)
+        self.table_sizer.AddGrowableCol(2)  # Let column #2 expand if needed
         self.table_sizer.SetFlexibleDirection(wx.HORIZONTAL)
 
-        # ----- 1) HEADERS ROW -----
+        # HEADERS ROW
         headers = [
             "Posición",
             "Habilitar",
-            "Dir. Registro",
+            "Dir. Registro (HEX - 0x)",
             "Tipo de Dato",
             "Número de Bytes",
             "Frec. Muestreo",
@@ -56,27 +90,27 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             header_text = wx.StaticText(self, label=header, style=wx.ALIGN_CENTER)
             self.table_sizer.Add(header_text, flag=wx.EXPAND | wx.ALL, border=5)
 
-        main_sizer.Add(self.table_sizer, flag=wx.EXPAND | wx.ALL, border=5)
+        # Add the table sizer to the regs_box_sizer
+        regs_box_sizer.Add(self.table_sizer, flag=wx.EXPAND | wx.ALL, border=5)
 
-        # Divider (horizontal line)
+        # Horizontal line (optional)
         divider = wx.StaticLine(self)
-        main_sizer.Add(divider, flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=5)
+        regs_box_sizer.Add(divider, flag=wx.EXPAND | wx.ALL, border=5)
 
-        # ----- 2) DATA ROWS -----
-        # If you already have data in self.modbus_info, you can populate now:
-        self.populate_data_rows()
+        # Table data rows get populated dynamically (see populate_data_rows()).
 
-        # ----- 3) Buttons -----
-        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        # read_button = wx.Button(self, label="Leer valores")
-        # read_button.Bind(wx.EVT_BUTTON, self.on_read)
-        # button_sizer.Add(read_button, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
+        # Buttons for the register table
+        regs_button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        save_button = wx.Button(self, label="Actualizar")
-        save_button.Bind(wx.EVT_BUTTON, self.on_save)
-        button_sizer.Add(save_button, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
+        # The existing “Actualizar” button for the register config
+        regs_update_button = wx.Button(self, label="Actualizar Registros")
+        regs_update_button.Bind(wx.EVT_BUTTON, self.on_save)
+        regs_button_sizer.Add(regs_update_button, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
 
-        main_sizer.Add(button_sizer, flag=wx.ALIGN_CENTER | wx.ALL, border=10)
+        regs_box_sizer.Add(regs_button_sizer, flag=wx.ALIGN_RIGHT | wx.ALL, border=5)
+
+        # Add the “Card #2” box to the main_sizer
+        main_sizer.Add(regs_box_sizer, flag=wx.EXPAND | wx.ALL, border=5)
 
         self.SetSizer(main_sizer)
 
@@ -94,25 +128,55 @@ class ModbusConfigPanel(wx.ScrolledWindow):
 
         return v_sizer
 
+    # ====================
+    #  CARD #1 METHODS
+    # ====================
+
+    def on_slave_update(self, event):
+        """
+        Called when the user clicks the “Actualizar” button in Card #1.
+        Here you can send the new slave address to the device, e.g.
+        AT+MBADDR=<value>
+        """
+        new_addr_str = self.slave_address_ctrl.GetValue().strip()
+        if not new_addr_str.isdigit():
+            wx.MessageBox("La dirección de slave debe ser un número entero.", "Error", wx.OK | wx.ICON_ERROR)
+            return
+
+        # Optionally send to device, e.g.:
+        if self.controller.is_open():
+            self.controller.send_command("AT+PROGMODE=1\r\n", False)
+            cmd = f"AT+MBADDR={new_addr_str}\r\n"
+            response = self.controller.send_command(cmd)
+            self.controller.send_command("AT+PROGMODE=0\r\n", False)
+            if response.strip() == "OK":
+                wx.MessageBox("Dirección de slave actualizada correctamente.", "Info", wx.OK | wx.ICON_INFORMATION)
+            else:
+                wx.MessageBox(f"Error actualizando dirección de slave.\nRespuesta: {response}",
+                              "Error",
+                              wx.OK | wx.ICON_ERROR)
+        else:
+            wx.MessageBox(
+                "No se puede actualizar la dirección de slave.\nEl puerto serial no está abierto.",
+                "Error",
+                wx.OK | wx.ICON_ERROR
+            )
+
+    # ====================
+    #  CARD #2 METHODS
+    # ====================
+
     def populate_data_rows(self):
         """
-        Creates a row of widgets for each entry in self.modbus_info.
-        Storing ALL widgets (including wx.StaticText for "Posición")
-        in self.row_controls so that clear_data_rows() can remove them.
+        Creates the table rows for each entry in self.modbus_info,
+        showing the register address in hex form (e.g. 0x64).
         """
-
-        # If this is a refresh, remove old rows first:
-        # self.clear_data_rows()
-
         for register in self.modbus_info:
-            # 1) Position (StaticText)
-            position_text = wx.StaticText(
-                self,
-                label=str(register["register_position"])
-            )
+            # 1) Position
+            position_text = wx.StaticText(self, label=str(register["register_position"]))
             self.table_sizer.Add(position_text, flag=wx.EXPAND | wx.ALL, border=2)
 
-            # 2) Enable Flag (checkbox)
+            # 2) Enable Flag
             enable_checkbox = wx.CheckBox(self)
             enable_checkbox.SetValue(bool(register["enable_flag"]))
             enable_checkbox.Bind(
@@ -121,20 +185,20 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             )
             self.table_sizer.Add(enable_checkbox, flag=wx.EXPAND | wx.ALL, border=2)
 
-            # 3) Modbus Address
-            modbus_address = wx.TextCtrl(
-                self,
-                value=str(register["modbus_register_address"])
-            )
-            self.table_sizer.Add(modbus_address, flag=wx.EXPAND | wx.ALL, border=2)
+            # 3) Modbus Address (shown as hex)
+            addr_dec = 0
+            try:
+                # If your data is stored as a string with decimal:
+                addr_dec = int(register["modbus_register_address"])
+            except ValueError:
+                addr_dec = 0
+            addr_hex_str = f"0x{addr_dec:X}"  # e.g. 0x64 if decimal is 100
+
+            modbus_address_ctrl = wx.TextCtrl(self, value=addr_hex_str)
+            self.table_sizer.Add(modbus_address_ctrl, flag=wx.EXPAND | wx.ALL, border=2)
 
             # 4) Data type
-            data_type = wx.ComboBox(
-                self,
-                choices=self.data_type_choices,
-                style=wx.CB_READONLY
-            )
-            # data_type index is register["data_type"] - 1
+            data_type = wx.ComboBox(self, choices=self.data_type_choices, style=wx.CB_READONLY)
             data_type_idx = max(
                 0,
                 min(register["data_type"] - 1, len(self.data_type_choices) - 1)
@@ -147,38 +211,27 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             self.table_sizer.Add(num_bytes, flag=wx.EXPAND | wx.ALL, border=2)
 
             # 6) Sampling frequency
-            sampling_frequency = wx.TextCtrl(
-                self,
-                value=str(register["sampling_frequency"])
-            )
+            sampling_frequency = wx.TextCtrl(self, value=str(register["sampling_frequency"]))
             self.table_sizer.Add(sampling_frequency, flag=wx.EXPAND | wx.ALL, border=2)
 
             # 7) Decimal positions
-            decimal_positions = wx.TextCtrl(
-                self,
-                value=str(register["decimal_positions"])
-            )
+            decimal_positions = wx.TextCtrl(self, value=str(register["decimal_positions"]))
             self.table_sizer.Add(decimal_positions, flag=wx.EXPAND | wx.ALL, border=2)
 
-            # 8) Cumulative flag (combo box)
+            # 8) Cumulative flag
             cumu_choice_idx = max(
                 0,
                 min(register["cumulative_flag"], len(self.cumulative_choices) - 1)
             )
-            cumulative_flag = wx.ComboBox(
-                self,
-                choices=self.cumulative_choices,
-                style=wx.CB_READONLY
-            )
+            cumulative_flag = wx.ComboBox(self, choices=self.cumulative_choices, style=wx.CB_READONLY)
             cumulative_flag.SetSelection(cumu_choice_idx)
             self.table_sizer.Add(cumulative_flag, flag=wx.EXPAND | wx.ALL, border=2)
 
-            # Store references to ALL widgets for this row,
-            # including position_text
+            # Store references
             controls_for_this_row = {
                 "position_text": position_text,
                 "enable_checkbox": enable_checkbox,
-                "modbus_address": modbus_address,
+                "modbus_address": modbus_address_ctrl,  # now has hex
                 "data_type": data_type,
                 "num_bytes": num_bytes,
                 "sampling_frequency": sampling_frequency,
@@ -187,69 +240,86 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             }
             self.row_controls.append(controls_for_this_row)
 
-            # Update initial state
+            # enable/disable
             self.update_controls_state(controls_for_this_row, bool(register["enable_flag"]))
 
-        # Layout so everything is properly aligned
+        self.Layout()
+
+    def clear_data_rows(self):
+        """
+        Remove existing data-row widgets from self.table_sizer, destroy them,
+        and clear self.row_controls so we can repopulate fresh data.
+        """
+        for row_ctrls in self.row_controls:
+            for widget in row_ctrls.values():
+                self.table_sizer.Detach(widget)
+                widget.Destroy()
+        self.row_controls.clear()
         self.Layout()
 
     def on_enter(self):
         """
         Called when this panel becomes the selected tab in the notebook.
-        For instance, you can query the device for values, or if the device isn't open,
-        populate with defaults, etc.
+        Re-read modbus_info and show them in hex form in the address field.
         """
         print("Inside the modbus config panel")
-        self.modbus_info = list()   # Clear existing data
+        self.modbus_info = []
 
         if self.controller.is_open():
             self.controller.send_command("AT+PROGMODE=1\r\n", False)
             dlg = wx.ProgressDialog(
                 "Leyendo parámetros",
                 "Por favor espere mientras se realiza la lectura",
-                maximum=1,
+                maximum=2,
                 parent=self,
                 style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
             )
+            time.sleep(0.5)  # optional delay
+            self.controller.flush_buffer()
+
+            modbus_slave_addr = self.controller.send_command("AT+MBADDR?\r\n")
+            dlg.Update(1, "Leyendo la dirección del Esclavo Modbus...")
+            print(f"Received Modbus Slave Address: {modbus_slave_addr}")
+            self.slave_address_ctrl.SetValue(modbus_slave_addr.split("\r\n")[0])
 
             modbus_reg_data = self.controller.send_command("AT+MBREGCFG?\r\n")
-
-            dlg.Update(1, "Leyendo la configuración Registros Modbus...")
+            print(f"Received Modbus Reg Data: {modbus_reg_data}")
+            dlg.Update(2, "Leyendo la configuración Registros Modbus...")
             modbus_reg_data_array = modbus_reg_data.split("\r\n")
             print(f"Modbus Reg Data: {modbus_reg_data_array}")
 
-            for modbus_reg_data_item in modbus_reg_data_array:
-                if modbus_reg_data_item:
-                    modbus_reg_data_item_array = modbus_reg_data_item.split(",")
+            for item in modbus_reg_data_array:
+                if item:
+                    parts = item.split(",")
                     self.modbus_info.append({
-                        "register_position": int(modbus_reg_data_item_array[0]),
-                        "enable_flag": int(modbus_reg_data_item_array[1]),
-                        "modbus_register_address": modbus_reg_data_item_array[2],
-                        "data_type": int(modbus_reg_data_item_array[3]),
-                        "num_bytes": modbus_reg_data_item_array[4],
-                        "sampling_frequency": modbus_reg_data_item_array[5],
-                        "decimal_positions": modbus_reg_data_item_array[6],
-                        "cumulative_flag": int(modbus_reg_data_item_array[7]),
+                        "register_position": int(parts[0]),
+                        "enable_flag": int(parts[1]),
+                        "modbus_register_address": parts[2],  # decimal (string), we'll show as hex
+                        "data_type": int(parts[3]),
+                        "num_bytes": parts[4],
+                        "sampling_frequency": parts[5],
+                        "decimal_positions": parts[6],
+                        "cumulative_flag": int(parts[7]),
                     })
+
             self.clear_data_rows()
             self.populate_data_rows()
 
             dlg.Destroy()
             self.controller.send_command("AT+PROGMODE=0\r\n", False)
         else:
-            # For demonstration, append some new data
+            # fallback or demo data
             for i in range(10):
                 self.modbus_info.append({
                     "register_position": i,
                     "enable_flag": 0,
-                    "modbus_register_address": 0,
+                    "modbus_register_address": "0x00",  # e.g. "0", "10", ...
                     "data_type": 1,
-                    "num_bytes": 0,
-                    "sampling_frequency": 0,
-                    "decimal_positions": 0,
+                    "num_bytes": "0",
+                    "sampling_frequency": "0",
+                    "decimal_positions": "0",
                     "cumulative_flag": 0
                 })
-            # Rebuild the UI rows
             self.clear_data_rows()
             self.populate_data_rows()
 
@@ -260,41 +330,25 @@ class ModbusConfigPanel(wx.ScrolledWindow):
                 wx.OK | wx.ICON_ERROR
             )
 
-    def update_controls_state(self, controls_dict, is_enabled):
-        """
-        Enable/disable the row controls based on is_enabled.
-        Typically we keep the checkbox itself always enabled.
-        """
-        for key, ctrl in controls_dict.items():
-            if key == "enable_checkbox":
-                continue
-            ctrl.Enable(is_enabled)
-
     def on_enable_flag_change(self, event, checkbox):
+        """
+        If user toggles the checkbox, we enable or disable the row's controls.
+        """
         is_enabled = event.IsChecked()
         for row in self.row_controls:
             if row["enable_checkbox"] is checkbox:
                 self.update_controls_state(row, is_enabled)
                 break
 
-    def on_read(self, event):
-        if self.controller.is_open():
-            wx.MessageBox("Reading values from device (stub).")
-            # Then clear and repopulate rows if new data is loaded.
-        else:
-            wx.MessageBox(
-                "No se puede leer la configuración de registros Modbus.\n"
-                "El puerto serial no está abierto.",
-                "Error",
-                wx.OK | wx.ICON_ERROR
-            )
+    def update_controls_state(self, controls_dict, is_enabled):
+        for key, ctrl in controls_dict.items():
+            if key == "enable_checkbox":
+                continue
+            ctrl.Enable(is_enabled)
 
     def on_save(self, event):
         """
-        Collect all row data using extract_data_from_row,
-        then send each row's data with a progress dialog.
-        Format: register_position,enable_flag,modbus_register_address,
-                data_type,num_bytes,sampling_frequency,decimal_positions,cumulative_flag
+        The 'Actualizar Registros' button. Gathers row data and sends to device.
         """
         if not self.controller.is_open():
             wx.MessageBox(
@@ -305,17 +359,16 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             )
             return
 
-        # 1) Gather rows
         rows_for_sending = []
         for row in self.row_controls:
             line = self.extract_data_from_row(row)
+            print(f"Row data: {line}")
             rows_for_sending.append(line)
 
         if not rows_for_sending:
             wx.MessageBox("No hay filas para guardar.", "Info", wx.OK | wx.ICON_INFORMATION)
             return
 
-        # 2) Create a progress dialog to show the user each row being sent
         total_rows = len(rows_for_sending)
         dialog = wx.ProgressDialog(
             "Guardando parámetros",
@@ -324,10 +377,10 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             parent=self,
             style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE | wx.PD_SMOOTH
         )
+
         self.controller.send_command("AT+PROGMODE=1\r\n", False)
-        # 3) Send each line as an AT command, updating the progress bar
+
         for i, row_str in enumerate(rows_for_sending, start=1):
-            # Optionally display which register is being processed
             register_position = row_str.split(",")[0]
             dialog_msg = f"Guardando parámetros para el registro {register_position}..."
             dialog.Update(i, dialog_msg)
@@ -335,9 +388,8 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             cmd = f"AT+MBREGCFG={row_str}\r\n"
             response = self.controller.send_command(cmd)
             print(f"Sent: {cmd.strip()}, Received: {response.strip()}")
-            time.sleep(0.5)  # Optional delay between commands
+            time.sleep(0.5)  # optional delay
 
-            # If your device typically returns "OK", handle errors if response != "OK"
             if response.strip() != "OK":
                 wx.MessageBox(
                     f"Error al guardar registro {register_position}.\n"
@@ -346,49 +398,47 @@ class ModbusConfigPanel(wx.ScrolledWindow):
                     wx.OK | wx.ICON_ERROR
                 )
                 dialog.Destroy()
+                self.controller.send_command("AT+PROGMODE=0\r\n", False)
                 return
+
         self.controller.send_command("AT+PROGMODE=0\r\n", False)
-        # 4) Clean up and inform the user
         dialog.Destroy()
+
         wx.MessageBox(
             "Todos los parámetros han sido enviados correctamente.",
             "Info",
             wx.OK | wx.ICON_INFORMATION
         )
 
-    def extract_data_from_row(self, row: list) -> str:
+    def extract_data_from_row(self, row: dict) -> str:
         """
-        Extracts data from a row of widgets and returns a comma-separated string.
-        :param row: list of widgets in a row
-        :return: str containing the row data
+        Builds a comma-separated string from the row widgets, removing
+        the '0x' prefix and sending the decimal integer instead.
+
+        e.g., if the user typed '0x160', we parse it as hex (352),
+        then store '352' in the final CSV line.
         """
-        # 1) register_position: from StaticText label
+        # 1) register_position
         register_position = int(row["position_text"].GetLabel())
 
-        # 2) enable_flag: from checkbox
+        # 2) enable_flag
         enable_flag = 1 if row["enable_checkbox"].GetValue() else 0
 
-        # 3) modbus_register_address: from TextCtrl
-        #   Convert to int if you need numeric, or keep string if sending as is.
-        modbus_register_address_str = row["modbus_address"].GetValue()
-        # Example: convert to int, then back to string (if you want consistent formatting)
-        # Otherwise, you can keep the raw string. We'll do int->str:
-        try:
-            modbus_register_address_int = int(modbus_register_address_str)
-        except ValueError:
-            modbus_register_address_int = 0  # fallback
-        modbus_register_address = str(modbus_register_address_int)
+        # 3) modbus_register_address
+        addr_str = row["modbus_address"].GetValue().strip()
+        # remove the 0x prefix if present
+        addr_str = addr_str.replace("0x", "").replace("0X", "")
 
-        # 4) data_type: from combo box (which stores a string, like "char")
-        #   We want the *index+1* in self.data_type_choices to match your device command format.
+        modbus_register_address_str = addr_str
+
+        # 4) data_type
         data_type_str = row["data_type"].GetValue()
-        # Find which index in data_type_choices
         if data_type_str in self.data_type_choices:
             data_type_index = self.data_type_choices.index(data_type_str) + 1
         else:
-            data_type_index = 0  # fallback
+            data_type_index = 0
 
-        # 5) num_bytes: from TextCtrl
+        # 5) num_bytes
         num_bytes_str = row["num_bytes"].GetValue()
         try:
             num_bytes_int = int(num_bytes_str)
@@ -397,50 +447,37 @@ class ModbusConfigPanel(wx.ScrolledWindow):
         num_bytes = str(num_bytes_int)
 
         # 6) sampling_frequency
-        sampling_frequency_str = row["sampling_frequency"].GetValue()
+        sampling_freq_str = row["sampling_frequency"].GetValue()
         try:
-            sampling_frequency_int = int(sampling_frequency_str)
+            sampling_freq_int = int(sampling_freq_str)
         except ValueError:
-            sampling_frequency_int = 0
-        sampling_frequency = str(sampling_frequency_int)
+            sampling_freq_int = 0
+        sampling_frequency = str(sampling_freq_int)
 
         # 7) decimal_positions
-        decimal_positions_str = row["decimal_positions"].GetValue()
+        decimal_str = row["decimal_positions"].GetValue()
         try:
-            decimal_positions_int = int(decimal_positions_str)
+            decimal_int = int(decimal_str)
         except ValueError:
-            decimal_positions_int = 0
-        decimal_positions = str(decimal_positions_int)
+            decimal_int = 0
+        decimal_positions = str(decimal_int)
 
-        # 8) cumulative_flag: from combo box
-        cumulative_str = row["cumulative_flag"].GetValue()
-        if cumulative_str in self.cumulative_choices:
-            cumulative_flag_index = self.cumulative_choices.index(cumulative_str)
+        # 8) cumulative_flag
+        cumu_str = row["cumulative_flag"].GetValue()
+        if cumu_str in self.cumulative_choices:
+            cumu_choice_idx = self.cumulative_choices.index(cumu_str)
         else:
-            cumulative_flag_index = 0
+            cumu_choice_idx = 0
 
-        # Build the single comma‐separated line
-        line = f"{register_position}," \
-               f"{enable_flag}," \
-               f"{modbus_register_address}," \
-               f"{data_type_index}," \
-               f"{num_bytes}," \
-               f"{sampling_frequency}," \
-               f"{decimal_positions}," \
-               f"{cumulative_flag_index}"
-
+        # Build the line with the *decimal* register address (no '0x')
+        line = (
+            f"{register_position},"
+            f"{enable_flag},"
+            f"{modbus_register_address_str},"
+            f"{data_type_index},"
+            f"{num_bytes},"
+            f"{sampling_frequency},"
+            f"{decimal_positions},"
+            f"{cumu_choice_idx}"
+        )
         return line
-
-    def clear_data_rows(self):
-        """
-        Remove existing "data row" widgets from table_sizer, destroy them,
-        and clear self.row_controls so we can repopulate fresh data.
-        """
-        for row_ctrls in self.row_controls:
-            # Detach and destroy *every* widget in the row, including position_text
-            for widget in row_ctrls.values():
-                self.table_sizer.Detach(widget)
-                widget.Destroy()
-
-        self.row_controls.clear()
-        self.Layout()

@@ -29,7 +29,7 @@ class SerialController:
 			timeout: float = 5.0,
 	):
 		self.port = port
-		self.baudrate = baudrate
+		self.baudrate = baudrate if baudrate is not None else 9600  # set default baud rate to 9600
 		self.byte_size = byte_size
 		self.parity = parity
 		self.stop_bits = stop_bits
@@ -96,7 +96,12 @@ class SerialController:
 
 		print(f"received data: {data}")
 
-		return data.decode("utf-8") if return_str else data
+		try:
+			final_data = data.decode("utf-8") if return_str else data
+		except UnicodeDecodeError:
+			final_data = data
+
+		return final_data
 
 	def flush_buffer(self):
 		self.serial.reset_input_buffer()

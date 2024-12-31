@@ -17,6 +17,7 @@ from app.panels.payload_config_panel import PayloadConfigPanel
 from app.back_logic.config_manager import get_from_config
 from app.dialogs.settings import SettingsDialog, EVT_PORT_CHANGED
 
+
 def set_taskbar_icon(frame, icon_path):
 	icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
 	icon_handle = windll.user32.LoadImageW(0, icon_path, win32con.IMAGE_ICON, 0, 0, icon_flags)
@@ -27,9 +28,10 @@ def set_taskbar_icon(frame, icon_path):
 
 	windll.user32.SendMessageW(frame.GetHandle(), win32con.WM_SETICON, win32con.ICON_SMALL, icon_handle)
 
+
 class MainFrame(wx.Frame):
 	def __init__(self, parent, title, serial_controller):
-		super(MainFrame, self).__init__(parent, title=title, size=(800, 600))
+		super(MainFrame, self).__init__(parent, title=title, size=(1200, 700))
 
 		self.serial_controller = serial_controller
 
@@ -164,7 +166,7 @@ class MainFrame(wx.Frame):
 
 	def on_about(self, event):
 		wx.MessageBox(
-			"ECM Config v1.1.0\n\n"
+			"ECM Config v1.1.1\n\n"
 			"Desarrollado por:\n\n"
 			"- Jorge Benavides Aspiazu\n\n\n"
 			"\t2024 Energy Automation Technologies, todos los derechos reservados."
