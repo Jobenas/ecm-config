@@ -1,3 +1,5 @@
+import time
+
 import wx
 
 
@@ -119,6 +121,8 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 	def on_read(self, event):
 		if self.controller.is_open():
 			self.controller.send_command("AT+PROGMODE=1\r\n", False)  # entering programming mode to stop the device
+			time.sleep(1)
+			self.controller.flush_buffer()
 			# from sending data via Modbus
 			dlg = wx.ProgressDialog(
 				"Leyendo parámetros",
@@ -128,6 +132,7 @@ class DeviceStatusPanel(wx.ScrolledWindow):
 				style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
 			)
 			network_type = self.controller.send_command("AT+NETWORK?\r\n")
+			print(f"Raw network type value: {network_type}")
 			network_type = network_type.split("\r\n")[0].split(": ")[1]
 			print(f"Raw network type value: {network_type}")
 			match network_type:

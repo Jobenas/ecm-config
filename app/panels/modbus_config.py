@@ -146,9 +146,20 @@ class ModbusConfigPanel(wx.ScrolledWindow):
         # Optionally send to device, e.g.:
         if self.controller.is_open():
             self.controller.send_command("AT+PROGMODE=1\r\n", False)
+            time.sleep(0.5)
+            self.controller.flush_buffer()
+            dlg = wx.ProgressDialog(
+                "Actualizando dirección del esclavo Modbus",
+                "Por favor espere mientras se actualiza el equipo",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
             cmd = f"AT+MBADDR={new_addr_str}\r\n"
+            dlg.Update(0, "Escribiendo nueva dirección")
             response = self.controller.send_command(cmd)
             self.controller.send_command("AT+PROGMODE=0\r\n", False)
+            dlg.Destroy()
             if response.strip() == "OK":
                 wx.MessageBox("Dirección de slave actualizada correctamente.", "Info", wx.OK | wx.ICON_INFORMATION)
             else:
@@ -267,6 +278,8 @@ class ModbusConfigPanel(wx.ScrolledWindow):
 
         if self.controller.is_open():
             self.controller.send_command("AT+PROGMODE=1\r\n", False)
+            time.sleep(0.5)
+            self.controller.flush_buffer()
             dlg = wx.ProgressDialog(
                 "Leyendo parámetros",
                 "Por favor espere mientras se realiza la lectura",

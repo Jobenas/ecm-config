@@ -166,7 +166,7 @@ class MainFrame(wx.Frame):
 
 	def on_about(self, event):
 		wx.MessageBox(
-			"ECM Config v1.1.1\n\n"
+			"ECM Config v1.1.2\n\n"
 			"Desarrollado por:\n\n"
 			"- Jorge Benavides Aspiazu\n\n\n"
 			"\t2024 Energy Automation Technologies, todos los derechos reservados."

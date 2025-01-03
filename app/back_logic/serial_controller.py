@@ -87,6 +87,7 @@ class SerialController:
 			return False
 
 	def send_command(self, command: str, return_str: bool = True) -> str | bytes:
+		print(f"sending command: {command}")
 		self.serial.write(command.encode("utf-8"))
 		time.sleep(1)
 		try:
