@@ -1,3 +1,4 @@
+import time
 import wx
 import wx.lib.scrolledpanel as scrolled
 
@@ -21,22 +22,29 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
             7:  "Modbus Register 7",
             8:  "Modbus Register 8",
             9:  "Modbus Register 9",
-            10: "Pulse Counter 1",
-            11: "Pulse Counter 2",
+            10: "Modbus Register 10",
+            11: "Modbus Register 11",
+            12: "Modbus Register 12",
+            13: "Modbus Register 13",
+            14: "Modbus Register 14",
+            15: "Modbus Register 15",
+            16: "Modbus Register 16",
+            17: "Modbus Register 17",
+            18: "Modbus Register 18",
+            19: "Modbus Register 19",
+            20: "Pulse Counter 1",
+            21: "Pulse Counter 2",
         }
 
-        # Will store references to the widgets in each row
         self.row_controls = []
 
-        # Flag that indicates whether we already placed a single combo box
-        # for an unassigned row. We only allow one combo for the first unassigned.
+        # Flag: only one combo box for unassigned
         self.unassigned_combo_placed = False
 
         # Build the UI
         self.init_ui()
 
-        # This call ensures we can scroll vertically (and/or horizontally).
-        # By default, let’s allow Y scrolling, and disable X scrolling (scroll_x=False).
+        # Set up scrolling
         self.SetupScrolling(scroll_x=False, scroll_y=True)
 
     def init_ui(self):
@@ -49,11 +57,11 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
             border=5
         )
 
-        # Create one FlexGridSizer for the 2-column table (headers + data).
+        # Table Sizer (2 columns: position, assigned_value)
         self.table_sizer = wx.FlexGridSizer(rows=0, cols=2, hgap=10, vgap=5)
         self.table_sizer.SetFlexibleDirection(wx.HORIZONTAL)
 
-        # ----- HEADERS -----
+        # Headers
         header1 = wx.StaticText(self, label="Posición")
         header2 = wx.StaticText(self, label="Variable Asignada")
 
@@ -62,11 +70,11 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
 
         main_sizer.Add(self.table_sizer, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
-        # Divider line
+        # Divider
         divider = wx.StaticLine(self)
         main_sizer.Add(divider, flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=5)
 
-        # ----- Buttons -----
+        # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         update_button = wx.Button(self, label="Actualizar")
@@ -79,7 +87,6 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
 
         main_sizer.Add(button_sizer, flag=wx.ALIGN_CENTER | wx.ALL, border=10)
 
-        # Tell the panel to use main_sizer for layout
         self.SetSizer(main_sizer)
 
     def create_title(self, title):
@@ -105,7 +112,6 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
         print("Inside PayloadConfigPanel - reading from device...")
 
         if self.controller.is_open():
-            # Show a small progress dialog
             dlg = wx.ProgressDialog(
                 "Leyendo configuración",
                 "Por favor espere mientras se lee la configuración...",
@@ -114,8 +120,15 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
                 style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
             )
 
+            # Enter program mode
             self.controller.send_command("AT+PROGMODE=1\r\n", False)
+            time.sleep(0.5)
+            self.controller.flush_buffer()
+
+            # Read the variable assignments
             cmd_response = self.controller.send_command("AT+MSGVAR?\r\n")
+
+            # Exit program mode
             self.controller.send_command("AT+PROGMODE=0\r\n", False)
 
             dlg.Update(1, "Lectura completada")
@@ -124,7 +137,6 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
             lines = cmd_response.split("\n")
             self.parse_msgvar_response(lines)
         else:
-            # Fallback if device is not open
             self.msg_info = [
                 {"position": i, "assigned_value": "unassigned"} for i in range(10)
             ]
@@ -136,13 +148,12 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
 
         self.clear_data_rows()
         self.populate_data_rows()
-
-        # Recompute scrolling after data changes
         self.SetupScrolling(scroll_x=False, scroll_y=True)
 
     def parse_msgvar_response(self, lines):
         """
-        Parse lines like '0 - 10' or '1 - unassigned'.
+        Parse lines like '0 - 10' or '1 - unassigned'
+        and fill self.msg_info accordingly.
         """
         self.msg_info.clear()
 
@@ -186,14 +197,10 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
         Only the FIRST unassigned row gets a ComboBox;
         all other unassigned rows remain 'unassigned' text.
         """
-        # Reset the flag so each time we re-populate,
-        # only one new combo can appear.
         self.unassigned_combo_placed = False
-
-        # Build a reverse map: name -> code
         name_to_code = {v: k for k, v in self.VAR_TYPE_MAP.items()}
 
-        # Figure out which codes are already assigned so we can remove them from the combo choices.
+        # Collect codes that are already assigned
         assigned_codes = set()
         for item in self.msg_info:
             if item["assigned_value"] != "unassigned" and "Desconocido" not in item["assigned_value"]:
@@ -209,7 +216,7 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
             pos_text = wx.StaticText(self, label=pos_str)
             self.table_sizer.Add(pos_text, flag=wx.ALL, border=5)
 
-            # Column 2: either combo or static text
+            # Column 2: either combo or text
             if assigned_str == "unassigned":
                 if not self.unassigned_combo_placed:
                     # Build a combo for the first unassigned row
@@ -223,33 +230,24 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
                         choices=combo_choices,
                         style=wx.CB_READONLY
                     )
-                    # Make it narrower
                     assigned_ctrl.SetMinSize((150, -1))
-
-                    # Mark that we've placed our single combo
                     self.unassigned_combo_placed = True
                 else:
-                    # All other unassigned rows: show a static text "unassigned"
                     assigned_ctrl = wx.StaticText(self, label="unassigned")
             else:
-                # It's assigned or "Desconocido(...)"
                 assigned_ctrl = wx.StaticText(self, label=assigned_str)
 
             self.table_sizer.Add(assigned_ctrl, flag=wx.ALL, border=5)
 
             self.row_controls.append({
                 "pos_text": pos_text,
-                "assigned_ctrl": assigned_ctrl,  # could be a ComboBox or StaticText
+                "assigned_ctrl": assigned_ctrl,
             })
 
-        # Force layout
         self.Layout()
-
-        # Important: call SetupScrolling again after populating
         self.SetupScrolling(scroll_x=False, scroll_y=True)
 
     def clear_data_rows(self):
-        """Remove existing data rows (not the header row) from the sizer."""
         for row_ctrls in self.row_controls:
             for widget in row_ctrls.values():
                 self.table_sizer.Detach(widget)
@@ -259,37 +257,94 @@ class PayloadConfigPanel(scrolled.ScrolledPanel):
 
     def on_update(self, event):
         """
-        Refresh logic (similar to on_enter).
-        But first, read the combo's selected value (if any),
-        map it to the code, and show or store that code.
+        When the user clicks "Actualizar":
+         1) We read the user-chosen combo (if any).
+         2) Enter program mode, wait 500ms, flush buffer.
+         3) Send the new code to the device.
+         4) Exit program mode.
+         5) Show a progress dialog around the operation.
+         6) Refresh by calling on_enter().
         """
-        # 1) If we have a combo box (the first unassigned row),
-        # read its value and find the code in VAR_TYPE_MAP
+        # If we have a combo box (the first unassigned row), read it
         name_to_code = {v: k for k, v in self.VAR_TYPE_MAP.items()}
+        chosen_code = None
+
         for row_ctrls in self.row_controls:
             assigned_ctrl = row_ctrls["assigned_ctrl"]
             if isinstance(assigned_ctrl, wx.ComboBox):
                 chosen_name = assigned_ctrl.GetValue().strip()
                 if chosen_name:
-                    code = name_to_code.get(chosen_name)
-                    print(f"Combo selection: '{chosen_name}' => code {code}")
-                    self.controller.send_command("AT+PROGMODE=1\r\n", False)
-                    res = self.controller.send_command(f"AT+MSGVAR={code}\r\n")
-                    self.controller.send_command("AT+PROGMODE=0\r\n", False)
+                    chosen_code = name_to_code.get(chosen_name)
+                    print(f"Combo selection: '{chosen_name}' => code {chosen_code}")
                 else:
                     print("Combo selection is empty.")
-                    # Show a dialog telling the user to select an option if needed.
-                # There's only one combo box, so we can break after reading it.
                 break
 
-        # 2) Then do the normal refresh (which calls on_enter)
+        if chosen_code is not None:
+            # Show a progress dialog for one-step update
+            dlg = wx.ProgressDialog(
+                "Actualizando configuración",
+                "Por favor espere mientras se actualiza la variable...",
+                maximum=1,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
+
+            # Enter program mode
+            self.controller.send_command("AT+PROGMODE=1\r\n", False)
+            time.sleep(0.5)
+            self.controller.flush_buffer()
+
+            # Send the new code
+            cmd = f"AT+MSGVAR={chosen_code}\r\n"
+            response = self.controller.send_command(cmd)
+
+            # Exit program mode
+            self.controller.send_command("AT+PROGMODE=0\r\n", False)
+
+            dlg.Update(1, "Variable actualizada")
+            dlg.Destroy()
+
+            if response.strip() != "OK":
+                wx.MessageBox(
+                    f"Error al actualizar la variable.\nRespuesta del dispositivo: {response}",
+                    "Error",
+                    wx.OK | wx.ICON_ERROR
+                )
+
+        # Then do the normal refresh (which calls on_enter)
         self.on_enter()
 
     def on_reset(self, event):
-        """Clear all assignments (make them 'unassigned')."""
+        """
+        Clear all assignments (make them 'unassigned').
+        We do the same Program Mode logic, plus a progress dialog.
+        """
+        dlg = wx.ProgressDialog(
+            "Reiniciando configuración",
+            "Por favor espere mientras se reinicia la asignación...",
+            maximum=1,
+            parent=self,
+            style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+        )
+
         self.controller.send_command("AT+PROGMODE=1\r\n", False)
-        self.controller.send_command("AT+MSGVAR=255\r\n")
+        time.sleep(0.5)
+        self.controller.flush_buffer()
+
+        response = self.controller.send_command("AT+MSGVAR=255\r\n")
+
         self.controller.send_command("AT+PROGMODE=0\r\n", False)
+
+        dlg.Update(1, "Reinicio completado")
+        dlg.Destroy()
+
+        if response.strip() != "OK":
+            wx.MessageBox(
+                f"Error al reiniciar la configuración.\nRespuesta: {response}",
+                "Error",
+                wx.OK | wx.ICON_ERROR
+            )
 
         wx.MessageBox(
             "Se ha reiniciado la configuración del payload.",

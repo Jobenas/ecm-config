@@ -142,10 +142,10 @@ class MainFrame(wx.Frame):
 		display_config_id = wx.NewIdRef()
 		ajustes_id = wx.NewIdRef()
 
-		self.toolbar.AddTool(open_port_id, "Abrir Puerto", wx.Bitmap(f"{ASSETS_DIR}/connect.ico"))
-		self.toolbar.AddTool(close_port_id, "Cerrar Puerto", wx.Bitmap(f"{ASSETS_DIR}/disconnect.ico"))
-		self.toolbar.AddTool(display_config_id, "Configurar Display externo", wx.Bitmap(f"{ASSETS_DIR}/display.ico"))
-		self.toolbar.AddTool(ajustes_id, "Ajustes", wx.Bitmap(f"{ASSETS_DIR}/settings_icon.png"))
+		self.toolbar.AddTool(open_port_id, "Abrir Puerto", wx.Bitmap(f"{ASSETS_DIR}/connect.ico"), shortHelp="Abrir Puerto")
+		self.toolbar.AddTool(close_port_id, "Cerrar Puerto", wx.Bitmap(f"{ASSETS_DIR}/disconnect.ico"), shortHelp="Cerrar Puerto")
+		self.toolbar.AddTool(display_config_id, "Configurar Display externo", wx.Bitmap(f"{ASSETS_DIR}/display.ico"), shortHelp="Configurar Display")
+		self.toolbar.AddTool(ajustes_id, "Ajustes", wx.Bitmap(f"{ASSETS_DIR}/settings_icon.png"), shortHelp="Ajustes")
 
 		self.toolbar.Realize()
 
@@ -166,7 +166,7 @@ class MainFrame(wx.Frame):
 
 	def on_about(self, event):
 		wx.MessageBox(
-			"ECM Config v1.1.2\n\n"
+			"ECM Config v1.1.4\n\n"
 			"Desarrollado por:\n\n"
 			"- Jorge Benavides Aspiazu\n\n\n"
 			"\t2024 Energy Automation Technologies, todos los derechos reservados."
@@ -220,28 +220,29 @@ class MainFrame(wx.Frame):
 	def on_port_changed(self, event):
 		"""
 		Called when the SettingsDialog is closed and the user saved changes to
-		port or baud rate. We'll use the new port, re-open it immediately (if possible),
-		and refresh the toolbar text.
+		port or baud rate. We'll forcibly close the old port, then re-open
+		using the new port and baud rate.
 		"""
 		new_port = event.get_port()
 
-		# The user might also have changed baud rate, so re-check config:
+		# The user might have changed baud rate, so re-check config:
 		new_baud_rate = get_from_config("baud_rate")
 		if new_baud_rate is not None:
 			self.serial_controller.update_baud_rate(int(new_baud_rate))
 
-		# Update the port in the controller
+		# Always close the old port (if open) to force a re-init
+		if self.serial_controller.is_open():
+			self.serial_controller.close()
+
+		# Update to the newly selected port
 		self.serial_controller.update_port(new_port)
 
-		# Attempt to open the port immediately with the new settings
-		if not self.serial_controller.is_open():
-			if not self.serial_controller.open():
-				wx.MessageBox("No se pudo abrir el puerto serial con la nueva configuración.")
-				self.serial_controller.serial_created = False
-		else:
-			# If it was already open with an old port, close and re-open
-			self.serial_controller.close()
-			self.serial_controller.open()
+		# Now attempt to open with the new settings
+		if not self.serial_controller.open():
+			wx.MessageBox("No se pudo abrir el puerto serial con la nueva configuración.")
+			self.serial_controller.serial_created = False
 
-		# Now reflect the changes on the toolbar
+		# Finally, reflect changes on the toolbar
 		self.update_port_status()
+
+
