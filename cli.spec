@@ -5,7 +5,7 @@ a = Analysis(
     ['cli.py'],
     pathex=[],
     binaries=[],
-    datas=[('app/*', 'app'), ('assets/*', 'assets')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -20,7 +20,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ECMConfig',
+    name='cli',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -31,7 +31,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/logo-small.ico',
+    icon='assets\\logo.ico',
 )
 coll = COLLECT(
     exe,
