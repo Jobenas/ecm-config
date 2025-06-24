@@ -7,9 +7,6 @@ class ModbusConfigPanel(wx.ScrolledWindow):
         super().__init__(parent)
         self.controller = modbus_controller
 
-        # We'll store an address for the slave, e.g., "1"
-        self.slave_address_value = ""
-
         # We'll store the list of rows for the modbus registers
         self.modbus_info = []
 
@@ -42,44 +39,25 @@ class ModbusConfigPanel(wx.ScrolledWindow):
         self.SetScrollRate(5, 5)
 
     def init_ui(self):
+        # Main sizer for the scrolled window
         main_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # ----- Title -----
-        main_sizer.Add(
-            self.create_title("Configuración de registros Modbus"),
-            flag=wx.EXPAND | wx.ALL,
-            border=5
-        )
-
-        # ====================
-        #  CARD #1: Slave Address
-        # ====================
-        slave_box = wx.StaticBox(self, label="Dirección de Slave Modbus")
-        slave_box_sizer = wx.StaticBoxSizer(slave_box, wx.VERTICAL)
-
-        slave_hsizer = wx.BoxSizer(wx.HORIZONTAL)
-        slave_label = wx.StaticText(self, label="Dirección de slave:")
-        slave_hsizer.Add(slave_label, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-
-        self.slave_address_ctrl = wx.TextCtrl(self, value=self.slave_address_value, size=(60, -1))
-        slave_hsizer.Add(self.slave_address_ctrl, flag=wx.RIGHT, border=10)
-
-        slave_update_btn = wx.Button(self, label="Actualizar")
-        slave_update_btn.Bind(wx.EVT_BUTTON, self.on_slave_update)
-        slave_hsizer.Add(slave_update_btn, flag=wx.LEFT, border=5)
-
-        slave_box_sizer.Add(slave_hsizer, flag=wx.ALL, border=10)
-        main_sizer.Add(slave_box_sizer, flag=wx.EXPAND | wx.ALL, border=5)
+        
+        # Set the scroll rate for the scrolled window
+        self.SetScrollRate(10, 10)
+        
+        # Add title
+        title_sizer = self.create_title(self, "Configuración de registros Modbus")
+        main_sizer.Add(title_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # ====================
-        #  CARD #2: Modbus Register Table
+        #  CARD #1: Modbus Register Table
         # ====================
         regs_box = wx.StaticBox(self, label="Registros Modbus")
         regs_box_sizer = wx.StaticBoxSizer(regs_box, wx.VERTICAL)
-
-        # 11 columns
+        
+        # 11 columns table
         self.table_sizer = wx.FlexGridSizer(rows=0, cols=11, hgap=5, vgap=5)
-        self.table_sizer.AddGrowableCol(2)  # example: let column #2 expand
+        self.table_sizer.AddGrowableCol(2)  # Let column #2 expand
         self.table_sizer.SetFlexibleDirection(wx.HORIZONTAL)
 
         # HEADERS ROW (11 columns)
@@ -90,43 +68,56 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             "Tipo de Dato",
             "Número de Bytes",
             "Frec. Muestreo",
-            "Formato de Float",     # (old decimal_positions) => combo of 4
-            "Tipo Variable",        # old cumulative_flag
-            "Dir. Esclavo",         # new column
-            "Func. Code",           # new column
-            "Tipo de Operación"     # new combo (op_type)
+            "Formato de Float",
+            "Tipo Variable",
+            "Dir. Esclavo",
+            "Func. Code",
+            "Tipo de Operación"
         ]
         for header in headers:
             header_text = wx.StaticText(self, label=header, style=wx.ALIGN_CENTER)
             self.table_sizer.Add(header_text, flag=wx.EXPAND | wx.ALL, border=5)
-
-        regs_box_sizer.Add(self.table_sizer, flag=wx.EXPAND | wx.ALL, border=5)
+        
+        # Add the table sizer to the box sizer
+        regs_box_sizer.Add(self.table_sizer, 1, wx.EXPAND | wx.ALL, 5)
+        
+        # Add a divider
         divider = wx.StaticLine(self)
-        regs_box_sizer.Add(divider, flag=wx.EXPAND | wx.ALL, border=5)
+        regs_box_sizer.Add(divider, 0, wx.EXPAND | wx.ALL, 5)
 
-        regs_button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        # Add buttons with proper alignment
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         regs_update_button = wx.Button(self, label="Actualizar Registros")
         regs_update_button.Bind(wx.EVT_BUTTON, self.on_save)
-        regs_button_sizer.Add(regs_update_button, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
-
-        regs_box_sizer.Add(regs_button_sizer, flag=wx.ALIGN_RIGHT | wx.ALL, border=5)
-        main_sizer.Add(regs_box_sizer, flag=wx.EXPAND | wx.ALL, border=5)
-
+        button_sizer.Add(regs_update_button, 0, wx.ALL, 5)
+        
+        # Add the button sizer to the box sizer with right alignment
+        button_sizer_container = wx.BoxSizer(wx.HORIZONTAL)
+        button_sizer_container.AddStretchSpacer()
+        button_sizer_container.Add(button_sizer, 0, wx.ALL, 0)
+        regs_box_sizer.Add(button_sizer_container, 0, wx.EXPAND | wx.ALL, 5)
+        
+        # Add the box sizer to the main sizer
+        main_sizer.Add(regs_box_sizer, 1, wx.EXPAND | wx.ALL, 5)
+        
+        # Set the sizer for the scrolled window
         self.SetSizer(main_sizer)
+        
+        # Set minimum size for the window
+        self.SetMinSize((1000, 600))
+        
+        # Force a layout update
+        self.Layout()
+        self.FitInside()
 
-    def create_title(self, title):
-        title_text = wx.StaticText(self, label=title)
-        title_text.SetFont(wx.Font(wx.FontInfo(12).Bold()))
-
+    def create_title(self, parent, title):
+        # Create a simple sizer with the title text
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add((20, 0))  # left padding
+        title_text = wx.StaticText(parent, label=title)
+        title_text.SetFont(wx.Font(wx.FontInfo(12).Bold()))
         sizer.Add(title_text)
-
-        v_sizer = wx.BoxSizer(wx.VERTICAL)
-        v_sizer.Add((0, 20))  # top padding
-        v_sizer.Add(sizer)
-
-        return v_sizer
+        return sizer
 
     # ====================
     #  CARD #1 METHODS
@@ -325,15 +316,14 @@ class ModbusConfigPanel(wx.ScrolledWindow):
             # ---- 1) Read the slave address
             dlg.Update(0, "Leyendo la dirección del esclavo...")
             slave_response = self.controller.send_command("AT+MBADDR?\r\n")
-            # Typically the device might return just a number, or something like "1"
-            # We'll store it in self.slave_address_ctrl if it's valid
+            # Store the slave address in the first row's slave address field if it exists
             slave_value = slave_response.strip().split("\r\n")[0]
-            if slave_value.isdigit():
-                self.slave_address_ctrl.SetValue(slave_value)
-            else:
+            if not slave_value.isdigit():
                 print(f"Unexpected slave address response: {slave_response}")
+                slave_value = "1"  # Default to 1 if invalid
 
             dlg.Update(1, "Dirección del esclavo leída exitosamente...")
+            self.default_slave_address = slave_value  # Store for later use
 
             # ---- 2) Read the register table
             regs_response = self.controller.send_command("AT+MBREGCFG?\r\n")
