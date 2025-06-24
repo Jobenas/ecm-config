@@ -3,7 +3,7 @@
 
 ; Define Product Information
 !define PRODUCT_NAME "ECMConfig"
-!define PRODUCT_VERSION "1.1.4"
+!define PRODUCT_VERSION "1.1.5"
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "ECMConfigSetup.exe"
 InstallDir "$PROGRAMFILES\ECMConfig"
