@@ -1,0 +1,11 @@
+.idea
+app/__pycache__
+app/back_logic/__pycache__
+app/dialogs/__pycache__
+app/panels/__pycache__
+dist
+Output
+^.spec
+build
+ECMConfigSetup.exe
+ECMConfigSetup.spec
