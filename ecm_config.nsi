@@ -5,6 +5,11 @@
 !define PRODUCT_NAME "ECMConfig"
 !define PRODUCT_VERSION "1.1.5"
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
+
+; Define MUI Settings
+!define MUI_FINISHPAGE_RUN "$INSTDIR\ecm_config.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Run ${PRODUCT_NAME}"
+!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchApplication"
 OutFile "ECMConfigSetup.exe"
 InstallDir "$PROGRAMFILES\ECMConfig"
 RequestExecutionLevel admin ; Request admin privileges for installation
@@ -14,6 +19,11 @@ RequestExecutionLevel admin ; Request admin privileges for installation
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
+
+; Function to launch the application
+Function LaunchApplication
+  Exec "$INSTDIR\ecm_config.exe"
+FunctionEnd
 
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
